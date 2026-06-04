@@ -4,6 +4,7 @@ Central logging — console + logs/run_report.md dashboard UI.
 
 import logging
 import shutil
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -69,6 +70,12 @@ class AgentLogger:
         self._write_dashboard()
         self._print_dashboard_header()
         self._publish_live_state()
+
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_thread = threading.Thread(
+            target=self._heartbeat_loop, name="dashboard-heartbeat", daemon=True
+        )
+        self._heartbeat_thread.start()
 
     # ── step UI ──────────────────────────────────────────────────
 
@@ -180,6 +187,7 @@ class AgentLogger:
         self.block(f"{module} — response", response, max_report_chars=6000)
 
     def finalize(self, success: bool, summary: dict):
+        self._heartbeat_stop.set()
         self._run_success = success
         for sid, _, _ in self.STEPS:
             if self._step_state[sid]["status"] == "running":
@@ -270,6 +278,15 @@ class AgentLogger:
             )
         except Exception:
             pass
+
+    def _heartbeat_loop(self) -> None:
+        """Refresh live_state.json while the pipeline is active (log tail, elapsed)."""
+        while not self._heartbeat_stop.wait(2.0):
+            if self._run_success is not None:
+                continue
+            running = any(s["status"] == "running" for s in self._step_state.values())
+            if running or any(s["status"] == "ok" for s in self._step_state.values()):
+                self._publish_live_state()
 
     def _write_dashboard(self):
         body = [

@@ -22,6 +22,5 @@ If context shows example functions or tests, treat them as the source of truth f
 
 ### Detected in this repo
 
-- Error wrapping: uses fmt.Errorf with %w verb
+- Tests: uses testify assert/require
 - Receivers: short single-letter names
-- Error returns: (result, error) tuple pattern

@@ -66,13 +66,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         if route == "/api/state":
             live_path = self.log_dir / "live_state.json"
+            snapshot: dict = {}
+            current_log: Path | None = None
             if live_path.is_file():
                 try:
-                    data = json.loads(live_path.read_text(encoding="utf-8"))
+                    cached = json.loads(live_path.read_text(encoding="utf-8"))
+                    snapshot = {
+                        "elapsed_sec": cached.get("elapsed_sec", 0),
+                        "success": cached.get("success"),
+                        "steps": cached.get("steps", []),
+                        "events": cached.get("events", []),
+                        "artifacts": cached.get("artifacts", []),
+                    }
+                    lp = cached.get("log_path")
+                    if lp:
+                        current_log = Path(lp)
                 except json.JSONDecodeError:
-                    data = build_live_payload({}, self.log_dir, self.output_dir)
-            else:
-                data = build_live_payload({}, self.log_dir, self.output_dir)
+                    pass
+            data = build_live_payload(
+                snapshot,
+                self.log_dir,
+                self.output_dir,
+                current_log_path=current_log,
+            )
             self._send_json(data)
             return
 

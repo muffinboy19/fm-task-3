@@ -1,35 +1,34 @@
 {
   "anchor_paths_used": [
-    "validator-master/validator_test.go"
+    "render/json.go"
   ],
   "grep_terms_used": [
-    "--- FAIL: TestHostnameRFC1123Validation (0.00s)",
-    "v10",
-    "FAIL",
-    "However",
-    "rfc1123",
-    "Hostname",
-    "According",
-    "hostname_rfc1123",
-    "TestHostnameRFC1123Validation",
-    "FAIL\tgithub.com/go-playground/validator/v10\t0.011s"
+    "AsciiJSON.Render",
+    "render.AsciiJSON",
+    "c.AsciiJSON(...)",
+    "unicode.MaxASCII",
+    "AsciiJSON",
+    "Body.String",
+    "json.Unmarshal",
+    "bytesconv.BytesToString(ret)",
+    "fmt",
+    "%04x"
   ],
   "candidate_files": [
-    "baked_in.go",
-    "translations/id/id.go",
-    "doc.go",
-    "non-standard/validators/notblank.go",
-    "_examples/gin-upgrading-overriding/v8_to_v9.go",
-    "validator_test.go"
+    "render/json.go",
+    "render/render.go",
+    "render/redirect.go",
+    "render/text.go",
+    "render/render_test.go"
   ],
   "candidate_function_names": [
-    "TestHostnameRFC1123Validation",
-    "TestHostnameRFC1123AliasValidation",
-    "isHostnameRFC1123",
-    "isHostnameRFC952",
-    "isHostnamePort",
-    "TestHostnameRFC952Validation"
+    "Render",
+    "TestRenderAsciiJSON",
+    "TestRenderAsciiJSONFail",
+    "WriteContentType",
+    "Render",
+    "WriteString"
   ],
-  "convention_snapshot": "- Error wrapping: uses fmt.Errorf with %w verb\n- Receivers: short single-letter names\n- Error returns: (result, error) tuple pattern",
-  "conventions_file": "/Users/gaurav/Desktop/pocketfmTask/output/conventions.md"
+  "convention_snapshot": "- Tests: uses testify assert/require\n- Receivers: short single-letter names",
+  "conventions_file": "/Users/gaurav/Desktop/alaph/output/conventions.md"
 }

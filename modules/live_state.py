@@ -116,9 +116,14 @@ def build_live_payload(
 
     validation = _read_json(output_dir / "validation_report.json")
 
+    elapsed = logger_snapshot.get("elapsed_sec", 0)
+    steps = logger_snapshot.get("steps", [])
+    any_running = any(s.get("status") == "running" for s in steps)
+
     return {
         "updated_at": datetime.now().isoformat(),
-        "elapsed_sec": logger_snapshot.get("elapsed_sec", 0),
+        "elapsed_sec": elapsed,
+        "any_running": any_running,
         "success": logger_snapshot.get("success"),
         "steps": logger_snapshot.get("steps", []),
         "events": logger_snapshot.get("events", []),

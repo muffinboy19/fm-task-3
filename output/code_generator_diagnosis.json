@@ -1,19 +1,16 @@
 {
-  "patch_lines": 158,
-  "patch_chars": 4100,
+  "patch_lines": 76,
+  "patch_chars": 2307,
   "ends_with_newline": true,
   "diff_file_count": 2,
-  "hunk_count": 5,
+  "hunk_count": 4,
   "issues": [
-    "HUNK_1_0_OLD_COUNT_MISMATCH: header says -22 lines, found 1 '-' lines",
-    "HUNK_1_0_NEW_COUNT_MISMATCH: header says +51 lines, found 45 on new side (30 '+', 15 ' ')",
-    "HUNK_1_1_OLD_COUNT_MISMATCH: header says -21 lines, found 1 '-' lines",
-    "HUNK_1_1_NEW_COUNT_MISMATCH: header says +21 lines, found 19 on new side (1 '+', 18 ' ')",
-    "HUNK_2_0_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines",
-    "HUNK_2_0_NEW_COUNT_MISMATCH: header says +25 lines, found 26 on new side (5 '+', 21 ' ')",
-    "HUNK_2_1_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines",
-    "HUNK_2_1_NEW_COUNT_MISMATCH: header says +25 lines, found 24 on new side (5 '+', 19 ' ')",
-    "HUNK_2_2_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines"
+    "HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
+    "HUNK_1_1_OLD_COUNT_MISMATCH: header says -11 lines, found 2 '-' lines",
+    "HUNK_1_1_NEW_COUNT_MISMATCH: header says +16 lines, found 15 on new side (7 '+', 8 ' ')",
+    "HUNK_2_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
+    "HUNK_2_0_NEW_COUNT_MISMATCH: header says +7 lines, found 6 on new side (1 '+', 5 ' ')",
+    "HUNK_2_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines"
   ],
   "git_apply_exit": 0,
   "git_apply_stderr": ""

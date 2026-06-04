@@ -1,158 +1,76 @@
-diff --git a/baked_in.go b/baked_in.go
-index 679729a..9fcade1 100644
---- a/baked_in.go
-+++ b/baked_in.go
-@@ -2882,22 +2882,51 @@ func isIP6Addr(fl FieldLevel) bool {
+diff --git a/render/json.go b/render/json.go
+index 2f98676..5717181 100644
+--- a/render/json.go
++++ b/render/json.go
+@@ -10,6 +10,7 @@ import (
+ 	"html/template"
+ 	"net/http"
+ 	"unicode"
++	"unicode/utf16"
 
- 	ip := net.ParseIP(val)
+ 	"github.com/gin-gonic/gin/codec/json"
+ 	"github.com/gin-gonic/gin/internal/bytesconv"
+@@ -160,11 +161,16 @@ func (r AsciiJSON) Render(w http.ResponseWriter) error {
+ 	}
 
- 	return ip != nil && ip.To4() == nil
- }
+ 	var buffer bytes.Buffer
+-	escapeBuf := make([]byte, 0, 6) // Preallocate 6 bytes for Unicode escape sequences
++	escapeBuf := make([]byte, 0, 12) // Preallocate 12 bytes for Unicode escape sequences (up to two per rune)
 
- func isHostnameRFC952(fl FieldLevel) bool {
- 	return hostnameRegexRFC952().MatchString(fl.Field().String())
- }
-
-+func isFourPartDottedDecimal(s string) bool {
-+	parts := strings.Split(s, ".")
-+	if len(parts) != 4 {
-+		return false
-+	}
-+	for _, part := range parts {
-+		if part == "" {
-+			return false
-+		}
-+		for i := 0; i < len(part); i++ {
-+			if part[i] < '0' || part[i] > '9' {
-+				return false
+ 	for _, r := range bytesconv.BytesToString(ret) {
+ 		if r > unicode.MaxASCII {
+-			escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r) // Reuse escapeBuf
++			if r > 0xFFFF {
++				r1, r2 := utf16.EncodeRune(r)
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x\\u%04x", r1, r2)
++			} else {
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r)
 +			}
-+		}
-+	}
-+	return true
-+}
+ 			buffer.Write(escapeBuf)
+ 		} else {
+ 			buffer.WriteByte(byte(r))
+diff --git a/render/render_test.go b/render/render_test.go
+index f63878b..0c64327 100644
+--- a/render/render_test.go
++++ b/render/render_test.go
+@@ -5,6 +5,7 @@
+ package render
+
+ import (
++	"encoding/json"
+ 	"encoding/xml"
+ 	"errors"
+ 	"html/template"
+@@ -259,6 +260,32 @@ func TestRenderAsciiJSON(t *testing.T) {
+ 	err = (AsciiJSON{data2}).Render(w2)
+ 	require.NoError(t, err)
+ 	assert.Equal(t, "3.1415926", w2.Body.String())
 +
-+func isHostnameRFC1123String(s string) bool {
-+	if !hostnameRegexRFC1123().MatchString(s) {
-+		return false
-+	}
-+	if isFourPartDottedDecimal(s) {
-+		ip := net.ParseIP(s)
-+		return ip != nil && ip.To4() != nil
-+	}
-+	return true
-+}
++	t.Run("nonBMP", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "😀"}
 +
- func isHostnameRFC1123(fl FieldLevel) bool {
--	return hostnameRegexRFC1123().MatchString(fl.Field().String())
-+	return isHostnameRFC1123String(fl.Field().String())
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Equal(t, `{"msg":"\ud83d\ude00"}`, w.Body.String())
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "😀", decoded["msg"])
++	})
++
++	t.Run("supplementaryBoundary", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "a\U00010000b"}
++
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Contains(t, w.Body.String(), `\ud800\udc00`)
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "a\U00010000b", decoded["msg"])
++	})
  }
 
- func isFQDN(fl FieldLevel) bool {
- 	val := fl.Field().String()
-
- 	if val == "" {
- 		return false
- 	}
-
- 	return fqdnRegexRFC1123().MatchString(val)
-@@ -3010,21 +3039,21 @@ func isHostnamePort(fl FieldLevel) bool {
- 	}
- 	// Port must be a iny <= 65535.
- 	if portNum, err := strconv.ParseInt(
- 		port, 10, 32,
- 	); err != nil || portNum > 65535 || portNum < 1 {
- 		return false
- 	}
-
- 	// If host is specified, it should match a DNS name
- 	if host != "" {
--		return hostnameRegexRFC1123().MatchString(host)
-+		return isHostnameRFC1123String(host)
- 	}
- 	return true
- }
-
- // IsPort validates if the current field's value represents a valid port
- func isPort(fl FieldLevel) bool {
- 	val := fl.Field().Uint()
-
- 	return val >= 1 && val <= 65535
- }
-diff --git a/validator_test.go b/validator_test.go
-index 67d3f83..e6536dc 100644
---- a/validator_test.go
-+++ b/validator_test.go
-@@ -10994,20 +10994,25 @@ func TestHostnameRFC1123Validation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 		{"", false},
- 		{"-example.com", false},
- 		{"example-.com", false},
- 		{"foo.-bar.com", false},
- 		{"foo.bar-.com", false},
- 		{"example..com", false},
-@@ -11054,20 +11059,25 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 	}
-
- 	validate := New()
- 	validate.RegisterAlias("hostname", "hostname_rfc1123")
-
- 	for i, test := range tests {
-@@ -13513,20 +13523,21 @@ func Test_hostnameport_validator(t *testing.T) {
-
- 	type testInput struct {
- 		data     string
- 		expected bool
- 	}
- 	testData := []testInput{
- 		{"bad..domain.name:234", false},
- 		{"extra.dot.com.", false},
- 		{"localhost:1234", true},
- 		{"192.168.1.1:1234", true},
-+		{"277.168.0.1:8080", false},
- 		{":1234", true},
- 		{"domain.com:1334", true},
- 		{"this.domain.com:234", true},
- 		{"domain:75000", false},
- 		{"missing.port", false},
- 	}
- 	for _, td := range testData {
- 		h := Host{Addr: td.data}
- 		v := New()
- 		err := v.Struct(h)
+ func TestRenderAsciiJSONFail(t *testing.T) {

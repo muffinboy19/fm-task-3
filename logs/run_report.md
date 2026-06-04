@@ -1,103 +1,275 @@
-# go-issue-solver — Run report
-**Started:** 2026-06-04T15:55:05.501936
+# Open Source Issue Solver — Run report
+**Started:** 2026-06-04T17:03:36.984528
 
 > Live dashboard: [dashboard.md](./dashboard.md)
 
 
 ---
 
-## go-issue-solver started
+## Open Source Issue Solver started
 
-- **Issue URL:** https://github.com/go-playground/validator/issues/1561
-- **Repo path:** /Users/gaurav/Desktop/pocketfmTask/validator
-- **Output dir:** /Users/gaurav/Desktop/pocketfmTask/output
+- **Issue URL:** https://github.com/gin-gonic/gin/issues/4688
+- **Output dir:** /Users/gaurav/Desktop/alaph/output
 - **LLM provider:** cursor
 - **Dry run:** False
+- ⚠️ Repo path not found (/Users/gaurav/Desktop/alaph/gin); cloning from issue URL
+- Cloning https://github.com/gin-gonic/gin.git -> /Users/gaurav/Desktop/alaph/test_repo/gin
+- **Cloned repo:** /Users/gaurav/Desktop/alaph/test_repo/gin
+- **Repo path:** /Users/gaurav/Desktop/alaph/test_repo/gin
 - Resetting repository (git checkout + clean)...
 - **Repo clean after reset:** True
 - Phase 1a: extracting raw issue from GitHub...
-- Fetching issue go-playground/validator#1561
-- Fetched issue + 0 comment(s)
-- **Title:** [Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check
-- **Labels:** ['bug']
-- **Identifiers:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname']
-- **Paths:** ['validator-master/validator_test.go']
+- Fetching issue gin-gonic/gin#4688
+- Fetched issue + 2 comment(s)
+- **Title:** AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes
+- **Labels:** []
+- **Identifiers:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel']
+- **Paths:** []
 - **Error strings:** []
-- **Linked issues:** []
-- **Search terms:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname', 'validator-master/validator_test.go']
+- **Linked issues:** ['gin-gonic/gin#2546']
+- **Search terms:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel', 'render.AsciiJSON', 'fmt.Appendf(buf, "\\\\u%04x", r)', '%04x', '\\uXXXXX', '\\u', '\\ud83d\\ude00', '😀', '{"msg":"\\u1f600"}', 'json.Unmarshal', 'ὠ0', 'ὠ', '0', 'render/json.go', '(master, commit', '(or', '### Go Version', '### Operating System', '**Output:**']
 
 #### Issue body
 
 ```
-### What happened?
+### Description
 
-According to rfc1123: "a valid host name can never have the dotted-decimal form #.#.#.#, since at least the highest-level component label will be alphabetic."
-However, for example, 277.168.0.1 is returned as a valid host, which is not a valid IPv4 address because of the first octet and should not be a valid hostname based on the rfc quoted above.
+`render.AsciiJSON` corrupts any Unicode code point above U+FFFF (non-BMP characters such as emoji). It escapes every non-ASCII rune with `fmt.Appendf(buf, "\\u%04x", r)`, but `%04x` is a *minimum* width, not a fixed width. A non-BMP rune needs 5+ hex digits, so a single 5-digit `\uXXXXX` token is written. JSON `\u` escapes are **exactly 4 hex digits**, so a decoder reads the first 4 as one character and the trailing digit(s) as literal text.
 
-### Version
+The output is still *syntactically valid* JSON (so this is not a parse error and is easy to miss), but the value is silently wrong — it does not round-trip.
 
-v10
+Per RFC 8259 §7, code points outside the BMP must be encoded as a UTF-16 surrogate pair (e.g. U+1F600 → `\ud83d\ude00`).
 
-### Example Code
+**Example — `😀` (U+1F600):**
+
+| | value |
+|---|---|
+| Input | `😀` |
+| `AsciiJSON` output | `{"msg":"\u1f600"}` |
+| After `json.Unmarshal` | `ὠ0`  (U+1F60 `ὠ` + literal `0`) |
+| Expected after round-trip | `😀` |
+
+Offending code — `render/json.go` (`AsciiJSON.Render`):
 
 ```go
-func TestHostnameRFC1123Validation(t *testing.T) {
-	tests := []struct {
-		param    string
-		expected bool
-	}{
-		{"277.168.0.1", false},
-         }
-....
+for _, r := range bytesconv.BytesToString(ret) {
+    if r > unicode.MaxASCII {
+        escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r) // 5+ digits for non-BMP → invalid escape
+        buffer.Write(escapeBuf)
+    } else {
+        buffer.WriteByte(byte(r))
+    }
 }
-
---- FAIL: TestHostnameRFC1123Validation (0.00s)
-validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>
-FAIL
-FAIL	github.com/go-playground/validator/v10	0.011s
-FAIL
 ```
+
+Related (but distinct — that one is about naming/content-type/deprecation, not this corruption): #2546.
+
+### Gin Version
+
+`v1.12.0` (master, commit `d83f866`)
+
+### Can you reproduce the bug?
+
+Yes.
+
+Steps:
+1. Render any payload containing a non-BMP character via `c.AsciiJSON(...)` (or `render.AsciiJSON`).
+2. Observe the response body contains a malformed `\uXXXXX` escape.
+3. `json.Unmarshal` the body — the decoded value differs from the original.
+
+### Source Code
+
+Minimal reproducible example:
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http/httptest"
+
+	"github.com/gin-gonic/gin/render"
+)
+
+func main() {
+	w := httptest.NewRecorder()
+	_ = render.AsciiJSON{Data: map[string]string{"msg": "😀"}}.Render(w)
+
+	out := w.Body.String()
+	fmt.Println("rendered:", out) // {"msg":"\u1f600"}
+
+	var decoded map[string]string
+	_ = json.Unmarshal([]byte(out), &decoded)
+	fmt.Printf("decoded: %q\n", decoded["msg"]) // "ὠ0", expected "😀"
+}
+```
+
+### Go Version
+
+`go1.25.0`
+
+### Operating System
+
+`Linux 6.17.0 x86_64` (codec-independent — the defect is in Gin's ASCII-escaping loop, not the JSON marshaler).
+
+
 ```
 - Phase 1b: structured intake (understanding engine)...
-- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator
-- LLM `issue_understanding` · `cursor/composer-2.5` (30.8s) · 1353 chars
+- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+- LLM `issue_understanding` · `cursor/composer-2.5` (16.8s) · 2952 chars
 
 #### issue_understanding — response
 
 ```
-{"symptom":"277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC1123 says a valid host name can never have the dotted-decimal form #.#.#.#.","expected":"According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168.0.1 should not validate as a hostname because it is not a valid IPv4 address (first octet out of range) and should fail hostname_rfc1123 validation.","actual":"277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects false but validation passes with Error: <nil>.","repro":"Run TestHostnameRFC1123Validation with param \"277.168.0.1\" and expected false using go-playground/validator v10; test fails at validator-master/validator_test.go:10679.","anchors":{"identifiers":["Bug","IPv4","What","According","However","Version","Example","Code","TestHostnameRFC1123Validation","FAIL","Hostname","hostname_rfc1123","rfc1123","v10"],"paths":["validator-master/validator_test.go","github.com/go-playground/validator/v10"],"error_strings":["--- FAIL: TestHostnameRFC1123Validation (0.00s)","validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>","FAIL","FAIL\tgithub.com/go-playground/validator/v10\t0.011s"],"linked_issues":[],"backtick_terms":[]},"type":"bug","open_questions":[],"confidence":"high"}
+{
+  "symptom": "AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \\u escapes.",
+  "expected": "After round-trip the decoded value should equal the original (e.g. 😀); per RFC 8259 §7, code points outside the BMP must be encoded as a UTF-16 surrogate pair (e.g. U+1F600 → \\ud83d\\ude00).",
+  "actual": "AsciiJSON output is {\"msg\":\"\\u1f600\"} for 😀; after json.Unmarshal the decoded value is ὠ0 (U+1F60 + literal 0), not 😀 — syntactically valid JSON but silently wrong and does not round-trip.",
+  "repro": "1. Render any payload containing a non-BMP character via c.AsciiJSON(...) or render.AsciiJSON. 2. Observe the response body contains a malformed \\uXXXXX escape (e.g. {\"msg\":\"\\u1f600\"} for 😀). 3. json.Unmarshal the body — the decoded value differs from the original. Minimal example: render.AsciiJSON{Data: map[string]string{\"msg\": \"😀\"}}.Render(w) then Unmarshal out.",
+  "anchors": {
+    "identifiers": [
+      "AsciiJSON",
+      "BMP",
+      "Description",
+      "Unicode",
+      "FFFF",
+      "ASCII",
+      "Appendf",
+      "Per",
+      "RFC",
+      "UTF",
+      "Example",
+      "Input",
+      "After",
+      "Unmarshal",
+      "Expected",
+      "Offending",
+      "AsciiJSON.Render",
+      "BytesToString",
+      "MaxASCII",
+      "Write",
+      "WriteByte",
+      "Related",
+      "Gin",
+      "Version",
+      "Can",
+      "Yes",
+      "Steps",
+      "Render",
+      "Observe",
+      "Source",
+      "Code",
+      "Minimal",
+      "NewRecorder",
+      "Data",
+      "Body.String",
+      "Println",
+      "Printf",
+      "Operating",
+      "System",
+      "Linux",
+      "Thank",
+      "CJK",
+      "Extension",
+      "Test",
+      "Results",
+      "FE0F",
+      "Original",
+      "Rendered",
+      "Decoded",
+      "Round",
+      "Output",
+      "Non",
+      "Character",
+      "Corruption",
+      "Issue",
+      "Confirmed",
+      "Scenario",
+      "Result",
+      "Working",
+      "Corrupted",
+      "PR",
+      "Thanks",
+      "Feel",
+      "bytesconv",
+      "unicode",
+      "escapeBuf",
+      "buffer",
+      "httptest",
+      "encoding/json",
+      "fmt"
+    ],
+    "paths": [
+      "render/json.go"
+    ],
+    "error_strings": [],
+    "linked_issues": [
+      "gin-gonic/gin#2546",
+      "#2546"
+    ],
+    "backtick_terms": [
+      "render.AsciiJSON",
+      "fmt.Appendf(buf, \"\\\\u%04x\", r)",
+      "%04x",
+      "\\uXXXXX",
+      "\\u",
+      "\\ud83d\\ude00",
+      "\ud83d\ude00",
+      "AsciiJSON",
+      "{\"msg\":\"\\u1f600\"}",
+      "json.Unmarshal",
+      "\u1f600",
+      "\u1f60",
+      "0",
+      "render/json.go",
+      "AsciiJSON.Render",
+      "(master, commit",
+      "(or",
+      "### Go Version",
+      "### Operating System",
+      "**Output:**",
+      "c.AsciiJSON(...)",
+      "fmt.Appendf(escapeBuf[:0], \"\\\\u%04x\", r)",
+      "unicode.MaxASCII",
+      "bytesconv.BytesToString(ret)"
+    ]
+  },
+  "type": "bug",
+  "open_questions": [],
+  "confidence": "high"
+}
 ```
 - Structured intake completed (LLM)
 - **Intake source:** llm
 - **Type:** bug
 - **Confidence:** high
-- **Symptom:** 277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC112
-- **Expected:** According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168
-- **Actual:** 277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects f
+- **Symptom:** AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes.
+- **Expected:** After round-trip the decoded value should equal the original (e.g. 😀); per RFC 8
+- **Actual:** AsciiJSON output is {"msg":"\u1f600"} for 😀; after json.Unmarshal the decoded va
 - **Open questions:** []
-- **Anchor identifiers:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname', 'hostname_rfc1123', 'rfc1123', 'v10']
-- **Anchor paths:** ['validator-master/validator_test.go', 'github.com/go-playground/validator/v10']
+- **Anchor identifiers:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel', 'bytesconv', 'unicode', 'escapeBuf', 'buffer', 'httptest', 'encoding/json', 'fmt']
+- **Anchor paths:** ['render/json.go']
 
 #### Repro (intake)
 
 ```
-Run TestHostnameRFC1123Validation with param "277.168.0.1" and expected false using go-playground/validator v10; test fails at validator-master/validator_test.go:10679.
+1. Render any payload containing a non-BMP character via c.AsciiJSON(...) or render.AsciiJSON. 2. Observe the response body contains a malformed \uXXXXX escape (e.g. {"msg":"\u1f600"} for 😀). 3. json.Unmarshal the body — the decoded value differs from the original. Minimal example: render.AsciiJSON{Data: map[string]string{"msg": "😀"}}.Render(w) then Unmarshal out.
 ```
-- **Curated grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\tgithub.com/go-playground/validator/v10\t0.011s']
-- Repo path: /Users/gaurav/Desktop/pocketfmTask/validator
+- **Curated grep terms:** ['AsciiJSON.Render', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'unicode.MaxASCII', 'AsciiJSON', 'Body.String', 'json.Unmarshal', 'bytesconv.BytesToString(ret)', 'fmt', '%04x']
+- Repo path: /Users/gaurav/Desktop/alaph/test_repo/gin
 - **code-review-graph available:** False
-- **Anchor paths:** ['validator-master/validator_test.go']
-- **Curated grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\tgithub.com/go-playground/validator/v10\t0.011s']
-- **Error strings:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>', 'FAIL', 'FAIL\tgithub.com/go-playground/validator/v10\t0.011s']
-- Located 6 candidate file(s)
+- **Anchor paths:** ['render/json.go']
+- **Curated grep terms:** ['AsciiJSON.Render', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'unicode.MaxASCII', 'AsciiJSON', 'Body.String', 'json.Unmarshal', 'bytesconv.BytesToString(ret)', 'fmt', '%04x']
+- **Error strings:** []
+- Located 5 candidate file(s)
 - Extracted 6 candidate function(s)
 
 #### Convention snapshot
 
 ```
-- Error wrapping: uses fmt.Errorf with %w verb
+- Tests: uses testify assert/require
 - Receivers: short single-letter names
-- Error returns: (result, error) tuple pattern
 ```
 
 #### Assembled LLM context
@@ -105,9 +277,9 @@ Run TestHostnameRFC1123Validation with param "277.168.0.1" and expected false us
 ```
 ## Issue intake (for scope)
 - **Type:** bug
-- **Symptom:** 277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC1123 says a valid host name can never have the dotted-decimal form #.#.#.#.
-- **Expected:** According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168.0.1 should not validate as a hostname because it is not a valid IPv4 address (first octet out of range) and should fail hostname_rfc1123 validation.
-- **Actual:** 277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects false but validation passes with Error: <nil>.
+- **Symptom:** AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes.
+- **Expected:** After round-trip the decoded value should equal the original (e.g. 😀); per RFC 8259 §7, code points outside the BMP must be encoded as a UTF-16 surrogate pair (e.g. U+1F600 → \ud83d\ude00).
+- **Actual:** AsciiJSON output is {"msg":"\u1f600"} for 😀; after json.Unmarshal the decoded value is ὠ0 (U+1F60 + literal 0), not 😀 — syntactically valid JSON but silently wrong and does not round-trip.
 
 ## Project conventions (required)
 
@@ -133,687 +305,397 @@ If context shows example functions or tests, treat them as the source of truth f
 
 ### Detected in this repo
 
-- Error wrapping: uses fmt.Errorf with %w verb
+- Tests: uses testify assert/require
 - Receivers: short single-letter names
-- Error returns: (result, error) tuple pattern
 
 ## Relevant function bodies
 
-### TestHostnameRFC1123Validation (validator_test.go, lines 10984-11042)
+### Render (render/json.go, lines 155-176)
 ```go
-func TestHostnameRFC1123Validation(t *testing.T) {
-	tests := []struct {
-		param    string
-		expected bool
-	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"1.foo.com", true},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"test_example", false},
-		{"192.168.0.1", true},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
-		{"", false},
-		{"-example.com", false},
-		{"example-.com", false},
-		{"foo.-bar.com", false},
-		{"foo.bar-.com", false},
-		{"example..com", false},
-		{".example.com", false},
-		{"foo.bar baz", false},
-		{"foo.bar/baz", false},
-		{"foo.bar:80", false},
-		{"foo$.example.com", false},
-		{"this-is-a-deliberately-overlong-subdomain-used-for-boundary-test.example.com", false},
-	}
-
-	validate := New()
-
-	for i, test := range tests {
-		errs := validate.Var(test.param, "hostname_rfc1123")
-
-		if test.expected {
-			if !IsEqual(errs, nil) {
-				t.Fatalf("Hostname: %v failed Error: %v", test, errs)
-			}
-		} else {
-			if IsEqual(errs, nil) {
-				t.Fatalf("Hostname: %v failed Error: %v", test, errs)
-			} else {
-				val := getError(errs, "", "")
-				if val.Tag() != "hostname_rfc1123" {
-					t.Fatalf("Hostname: %v failed Error: %v", i, errs)
-				}
-			}
-		}
-	}
-}
-```
-### TestHostnameRFC1123AliasValidation (validator_test.go, lines 11044-11091)
-```go
-func TestHostnameRFC1123AliasValidation(t *testing.T) {
-	tests := []struct {
-		param    string
-		expected bool
-	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"1.foo.com", true},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"test_example", false},
-		{"192.168.0.1", true},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
-	}
-
-	validate := New()
-	validate.RegisterAlias("hostname", "hostname_rfc1123")
-
-	for i, test := range tests {
-		errs := validate.Var(test.param, "hostname")
-
-		if test.expected {
-			if !IsEqual(errs, nil) {
-				t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-			}
-		} else {
-			if IsEqual(errs, nil) {
-				t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-			} else {
-				val := getError(errs, "", "")
-				if val.Tag() != "hostname" {
-					t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-				}
-			}
-		}
-	}
-}
-```
-### isHostnameRFC1123 (baked_in.go, lines 2892-2894)
-```go
-func isHostnameRFC1123(fl FieldLevel) bool {
-	return hostnameRegexRFC1123().MatchString(fl.Field().String())
-}
-```
-### isHostnameRFC952 (baked_in.go, lines 2888-2890)
-```go
-func isHostnameRFC952(fl FieldLevel) bool {
-	return hostnameRegexRFC952().MatchString(fl.Field().String())
-}
-```
-### isHostnamePort (baked_in.go, lines 3005-3023)
-```go
-func isHostnamePort(fl FieldLevel) bool {
-	val := fl.Field().String()
-	host, port, err := net.SplitHostPort(val)
+func (r AsciiJSON) Render(w http.ResponseWriter) error {
+	r.WriteContentType(w)
+	ret, err := json.API.Marshal(r.Data)
 	if err != nil {
-		return false
-	}
-	// Port must be a iny <= 65535.
-	if portNum, err := strconv.ParseInt(
-		port, 10, 32,
-	); err != nil || portNum > 65535 || portNum < 1 {
-		return false
+		return err
 	}
 
-	// If host is specified, it should match a DNS name
-	if host != "" {
-		return hostnameRegexRFC1123().MatchString(host)
-	}
-	return true
-}
-```
-### TestHostnameRFC952Validation (validator_test.go, lines 10929-10982)
-```go
-func TestHostnameRFC952Validation(t *testing.T) {
-	tests := []struct {
-		param    string
-		expected bool
-	}{
-		{"test.example.com", true},
-		{"example.com", true},
-		{"example24.com", true},
-		{"test.example24.com", true},
-		{"test24.example24.com", true},
-		{"example", true},
-		{"EXAMPLE", true},
-		{"1.foo.com", false},
-		{"test.example.com.", false},
-		{"example.com.", false},
-		{"example24.com.", false},
-		{"test.example24.com.", false},
-		{"test24.example24.com.", false},
-		{"example.", false},
-		{"192.168.0.1", false},
-		{"email@example.com", false},
-		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
-		{"2001:cdba:0:0:0:0:3257:9652", false},
-		{"2001:cdba::3257:9652", false},
-		{"example..........com", false},
-		{"1234", false},
-		{"abc1234", true},
-		{"example. com", false},
-		{"ex ample.com", false},
-		{"foo-.example.com", false}, // label ends with '-' (RFC 952)
-		{"host-.tld", false},
-	}
+	var buffer bytes.Buffer
+	escapeBuf := make([]byte, 0, 6) // Preallocate 6 bytes for Unicode escape sequences
 
-	validate := New()
-
-	for i, test := range tests {
-		errs := validate.Var(test.param, "hostname")
-
-		if test.expected {
-			if !IsEqual(errs, nil) {
-				t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-			}
+	for _, r := range bytesconv.BytesToString(ret) {
+		if r > unicode.MaxASCII {
+			escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r) // Reuse escapeBuf
+			buffer.Write(escapeBuf)
 		} else {
-			if IsEqual(errs, nil) {
-				t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-			} else {
-				val := getError(errs, "", "")
-				if val.Tag() != "hostname" {
-					t.Fatalf("Index: %d hostname failed Error: %v", i, errs)
-				}
-			}
+			buffer.WriteByte(byte(r))
 		}
 	}
+
+	_, err = w.Write(buffer.Bytes())
+	return err
+}
+```
+### TestRenderAsciiJSON (render/render_test.go, lines 243-262)
+```go
+func TestRenderAsciiJSON(t *testing.T) {
+	w1 := httptest.NewRecorder()
+	data1 := map[string]any{
+		"lang": "GO语言",
+		"tag":  "<br>",
+	}
+
+	err := (AsciiJSON{data1}).Render(w1)
+
+	require.NoError(t, err)
+	assert.JSONEq(t, "{\"lang\":\"GO\\u8bed\\u8a00\",\"tag\":\"\\u003cbr\\u003e\"}", w1.Body.String())
+	assert.Equal(t, "application/json", w1.Header().Get("Content-Type"))
+
+	w2 := httptest.NewRecorder()
+	data2 := 3.1415926
+
+	err = (AsciiJSON{data2}).Render(w2)
+	require.NoError(t, err)
+	assert.Equal(t, "3.1415926", w2.Body.String())
+}
+```
+### TestRenderAsciiJSONFail (render/render_test.go, lines 264-270)
+```go
+func TestRenderAsciiJSONFail(t *testing.T) {
+	w := httptest.NewRecorder()
+	data := make(chan int)
+
+	// json: unsupported type: chan int
+	require.Error(t, (AsciiJSON{data}).Render(w))
+}
+```
+### WriteContentType (render/json.go, lines 179-181)
+```go
+func (r AsciiJSON) WriteContentType(w http.ResponseWriter) {
+	writeContentType(w, jsonASCIIContentType)
+}
+```
+### Render (render/redirect.go, lines 20-26)
+```go
+func (r Redirect) Render(w http.ResponseWriter) error {
+	if (r.Code < http.StatusMultipleChoices || r.Code > http.StatusPermanentRedirect) && r.Code != http.StatusCreated {
+		panic(fmt.Sprintf("Cannot redirect with status code %d", r.Code))
+	}
+	http.Redirect(w, r.Request, r.Location, r.Code)
+	return nil
+}
+```
+### WriteString (render/text.go, lines 33-41)
+```go
+func WriteString(w http.ResponseWriter, format string, data []any) (err error) {
+	writeContentType(w, plainContentType)
+	if len(data) > 0 {
+		_, err = fmt.Fprintf(w, format, data...)
+		return
+	}
+	_, err = w.Write(bytesconv.StringToBytes(format))
+	return
 }
 ```
 
 ## Neighbor signatures (callers/callees — no bodies)
 
 ```go
-// errors.go
-func (fe *fieldError) Tag() string
+// internal/bytesconv/bytesconv.go
+func BytesToString(b []byte) string
 ```
 ```go
-// validator_instance.go
-func (v *Validate) Var(field interface{}, tag string) error
+// render/protobuf.go
+func (r ProtoBuf) WriteContentType(w http.ResponseWriter)
 ```
 ```go
-// validator_instance.go
-func New(options ...Option) *Validate
+// render/render_msgpack_test.go
+func (w *failWriter) Write(data []byte) (int, error)
 ```
 ```go
-// validator_instance.go
-func (v *Validate) RegisterAlias(alias, tags string)
+// codec/json/json.go
+func (j jsonApi) Marshal(v any) ([]byte, error)
 ```
 ```go
-// errors.go
-func (fe *fieldError) Field() string
+// render/render_test.go
+func (w *errorWriter) Header() http.Header
 ```
 ```go
-// _examples/validate_fn/enum_enumer.go
-func (i Enum) String() string
+// render/protobuf.go
+func (r ProtoBuf) Render(w http.ResponseWriter) error
+```
+```go
+// testdata/protoexample/test.pb.go
+func (x *Test_OptionalGroup) String() string
+```
+```go
+// context.go
+func (c *Context) Get(key any) (value any, exists bool)
+```
+```go
+// binding/default_validator.go
+func (err SliceValidationError) Error() string
+```
+```go
+// context.go
+func (c *Context) Redirect(code int, location string)
+```
+```go
+// internal/bytesconv/bytesconv.go
+func StringToBytes(s string) []byte
 ```
 ```
-- **Anchor paths:** ['validator-master/validator_test.go']
-- **Grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\tgithub.com/go-playground/validator/v10\t0.011s']
-- **Files in scope:** baked_in.go, translations/id/id.go, doc.go, non-standard/validators/notblank.go, _examples/gin-upgrading-overriding/v8_to_v9.go, validator_test.go
-- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator
-- LLM `code_reasoning` · `cursor/composer-2.5` (85.6s) · 4552 chars
+- **Anchor paths:** ['render/json.go']
+- **Grep terms:** ['AsciiJSON.Render', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'unicode.MaxASCII', 'AsciiJSON', 'Body.String', 'json.Unmarshal', 'bytesconv.BytesToString(ret)', 'fmt', '%04x']
+- **Files in scope:** render/json.go, render/render.go, render/redirect.go, render/text.go, render/render_test.go
+- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+- LLM `code_reasoning` · `cursor/composer-2.5` (17.5s) · 3488 chars
 
 #### code_reasoning — response
 
 ```
 ## Root cause
 
-`isHostnameRFC1123` only checks `hostnameRegexRFC1123()`, which allows labels to start with digits and treats each dot-separated segment as a hostname label. Strings like `277.168.0.1` match because `277`, `168`, `0`, and `1` are valid numeric labels under that pattern.
-
-There is no follow-up for IPv4-shaped input. Per RFC 1123, dotted-decimal strings that look like IPv4 must be syntactically valid IPv4 before acceptance (see also issue #1327 in this repo). `net.ParseIP("277.168.0.1")` returns `nil`, but the validator never calls it, so invalid octets still pass.
-
-The same gap exists in `isHostnamePort`, which reuses `hostnameRegexRFC1123().MatchString(host)` without an octet check.
+`AsciiJSON.Render` in `render/json.go` escapes every rune above `unicode.MaxASCII` with `fmt.Appendf(..., "\\u%04x", r)`. For `%04x`, width 4 is a **minimum**, so supplementary-plane code points (U+10000 and above) produce **5+** hex digits (e.g. U+1F600 → `\u1f600`). RFC 8259 requires **exactly four** hex digits per `\u` escape; decoders treat the first four as one code unit and any extra digits as literal text. The JSON stays valid but the string no longer round-trips.
 
 ## Proposed fix
 
-1. **Add a narrow pre-check** in `baked_in.go` (unexported helper, e.g. `isHostnameRFC1123String(s string) bool`) used by both `isHostnameRFC1123` and `isHostnamePort`:
-   - If `hostnameRegexRFC1123()` does not match → return `false`.
-   - If the value is **four-part dotted decimal** (exactly four `.`-separated labels, each non-empty and all ASCII digits) → require `net.ParseIP(s) != nil && ip.To4() != nil`; otherwise return `false`.
-   - Otherwise → return `true` (regex match is sufficient).
+In the `r > unicode.MaxASCII` branch of `AsciiJSON.Render`:
 
-2. **Do not change** `hostnameRegexStringRFC1123` in `regexes.go` (maintainer feedback on PR #1562: regex-only fixes are insufficient; broad “digits and dots” checks are error-prone).
+1. **BMP** (`r <= 0xFFFF`): keep the current single `\u%04x` escape (unchanged behavior for existing tests like `GO语言` and `<br>`).
+2. **Non-BMP** (`r > 0xFFFF`): encode per RFC 8259 using a UTF-16 surrogate pair via `unicode/utf16.EncodeRune(r)`, then write **two** `\u%04x` escapes (e.g. U+1F600 → `\ud83d\ude00`).
 
-3. **Performance:** call `net.ParseIP` only when the four-part all-decimal shape is detected, not for every hostname (e.g. `example.com`, `1.foo.com`).
+Reuse the existing `escapeBuf` + `fmt.Appendf` pattern; for supplementary runes, either append twice with `escapeBuf[:0]` or one `Appendf` with two `%04x` verbs. Bump `escapeBuf` capacity from 6 to **12** (two `\uXXXX` sequences) and update the comment.
 
-4. **Keep** `{"192.168.0.1", true}` in existing tests — RFC 1123 allows dotted-decimal host identity when it is valid IPv4; `fqdn` already rejects pure numeric forms via its TLD rule.
+No changes to `Context.AsciiJSON`, content-type handling, or marshaling — only the post-marshal ASCII-escaping loop.
 
 ## Files to change
 
 | File | Change |
 |------|--------|
-| `baked_in.go` | Extend `isHostnameRFC1123`; add small helper(s) for four-part decimal detection + shared RFC1123 hostname validation; update `isHostnamePort` host check to use the same logic |
-| `validator_test.go` | Extend `TestHostnameRFC1123Validation` and `TestHostnameRFC1123AliasValidation`; optionally extend `Test_hostnameport_validator` for invalid IPv4 host |
-
-No changes to `regexes.go`, translations, or `doc.go` unless you want doc wording about the dotted-decimal rule (optional, out of minimal scope).
+| `render/json.go` | Import `unicode/utf16`; branch on `r > 0xFFFF` to emit surrogate pair; adjust `escapeBuf` cap/comment |
+| `render/render_test.go` | Add non-BMP coverage to `TestRenderAsciiJSON` (or a `t.Run` subtest) |
 
 ## Test strategy
 
-All tests stay in `validator_test.go`, same table-driven style and assertions (`IsEqual`, `getError`, tag `hostname_rfc1123` / `hostname`).
+All tests in `render/render_test.go`, same package and testify style as siblings.
 
-### `TestHostnameRFC1123Validation`
+1. **Extend `TestRenderAsciiJSON`** (recommended: `t.Run("nonBMP", ...)`)  
+   - **Setup:** `httptest.NewRecorder()`, `AsciiJSON{Data: map[string]string{"msg": "😀"}}`  
+   - **Render:** `require.NoError(t, err)`  
+   - **Wire format:** `assert.Equal(t, `{"msg":"\ud83d\ude00"}`, w.Body.String())` — exact lowercase hex, surrogate pair, **not** `\u1f600`  
+   - **Round-trip:** `json.Unmarshal` body into `map[string]string`; `assert.Equal(t, "😀", decoded["msg"])`  
+   - **Failing-before / passing-after:** on current master, body is `{"msg":"\u1f600"}` and decoded value is not `"😀"`; both assertions fail before the fix and pass after.
 
-Add rows to the existing table (fail before fix, pass after):
+2. **Regression guard for existing BMP behavior**  
+   - Leave the existing `data1` / `data2` cases in `TestRenderAsciiJSON` unchanged; they must still pass (`GO\u8bed\u8a00`, `\u003cbr\u003e`, scalar `3.1415926`).
 
-| `param` | `expected` | Rationale |
-|---------|------------|-----------|
-| `277.168.0.1` | `false` | Issue repro: invalid first octet |
-| `256.1.1.1` | `false` | Octet > 255 |
-| `123.456.789.0` | `false` | Multiple invalid octets |
-| `01.2.3.4` | `false` | Leading-zero label; `net.ParseIP` rejects |
+3. **Optional boundary subtest** `t.Run("supplementaryBoundary", ...)`  
+   - Input: `"a\U00010000b"` (first supplementary code point)  
+   - **Expected body fragment:** `\ud800\udc00` between `a` and `b`  
+   - **Round-trip:** decoded string equals original  
 
-Keep existing pass cases unchanged, especially:
+4. **`TestRenderAsciiJSONFail`** — no change (marshal error path untouched).
 
-| `param` | `expected` |
-|---------|------------|
-| `192.168.0.1` | `true` |
-| `1.2.3.4` | `true` (add if missing — valid IPv4, should remain valid) |
-| `example.com`, `1.foo.com` | `true` |
-
-**Before fix:** run `go test -run TestHostnameRFC1123Validation`; new `277.168.0.1` row should fail with `Error: <nil>`.  
-**After fix:** full `go test ./...` (or at least package root tests).
-
-### `TestHostnameRFC1123AliasValidation`
-
-Mirror the same new invalid IPv4 rows; keep `192.168.0.1` → `true`; assert tag `hostname` on failures.
-
-### `Test_hostnameport_validator` (recommended)
-
-Add:
-
-| `data` | `expected` |
-|--------|------------|
-| `277.168.0.1:8080` | `false` |
-| `192.168.1.1:1234` | `true` (existing) |
-
-Ensures `isHostnamePort` stays consistent with `hostname_rfc1123`.
+Run: `go test ./render/... -run TestRenderAsciiJSON -v` (and full `go test ./...` if desired).
 
 ## Risks / assumptions
 
-- **Assumption:** Fix scope is **invalid four-part dotted decimal** (reject when `net.ParseIP` fails), not banning all dotted-decimal hostnames. That matches existing `192.168.0.1` → `true`, RFC 1123 §2 host-identity guidance (#1327), and maintainer PR #1562 direction (four-part check only).
-- **Behavior change:** Values like `01.2.3.4` that match the regex today will start failing; document if that is undesirable.
-- **`isOrigin` (or similar) in `baked_in.go` ~1603** uses `net.ParseIP(hostname) == nil && hostnameRegexRFC1123()` and may still accept `277.168.0.1` via regex alone; out of scope for tag `hostname_rfc1123` unless explicitly requested.
-- **No regex change** avoids breaking numeric multi-label names (`1.foo.com`, `24.example24.com`).
-- Reuse `strings` + `net.ParseIP` only; no new dependencies.
+- **Assumption:** Lowercase `\u` hex is required to match existing tests and `%04x` output.
+- **Assumption:** `json.API.Marshal` emits UTF-8 runes for string values (not pre-escaped `\u` sequences); the loop only needs to fix runes it encounters after marshal — same model as today.
+- **Scope:** Lone UTF-16 surrogate code units (invalid Unicode scalars) are out of scope; behavior for those runes is unchanged.
+- **Risk:** Minimal — only affects `AsciiJSON` output for supplementary characters; BMP and ASCII paths are identical.
 ```
-- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator
-- LLM `code_generator` · `cursor/composer-2.5` (68.2s) · 4124 chars
+- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+- LLM `code_generator` · `cursor/composer-2.5` (62.0s) · 2323 chars
 
 #### code_generator — response
 
 ```
 ```diff
-diff --git a/baked_in.go b/baked_in.go
-index 679729a..9fcade1 100644
---- a/baked_in.go
-+++ b/baked_in.go
-@@ -2882,22 +2882,51 @@ func isIP6Addr(fl FieldLevel) bool {
+diff --git a/render/json.go b/render/json.go
+index 2f98676..5717181 100644
+--- a/render/json.go
++++ b/render/json.go
+@@ -10,6 +10,7 @@ import (
+ 	"html/template"
+ 	"net/http"
+ 	"unicode"
++	"unicode/utf16"
  
- 	ip := net.ParseIP(val)
+ 	"github.com/gin-gonic/gin/codec/json"
+ 	"github.com/gin-gonic/gin/internal/bytesconv"
+@@ -160,11 +161,16 @@ func (r AsciiJSON) Render(w http.ResponseWriter) error {
+ 	}
  
- 	return ip != nil && ip.To4() == nil
- }
+ 	var buffer bytes.Buffer
+-	escapeBuf := make([]byte, 0, 6) // Preallocate 6 bytes for Unicode escape sequences
++	escapeBuf := make([]byte, 0, 12) // Preallocate 12 bytes for Unicode escape sequences (up to two per rune)
  
- func isHostnameRFC952(fl FieldLevel) bool {
- 	return hostnameRegexRFC952().MatchString(fl.Field().String())
- }
- 
-+func isFourPartDottedDecimal(s string) bool {
-+	parts := strings.Split(s, ".")
-+	if len(parts) != 4 {
-+		return false
-+	}
-+	for _, part := range parts {
-+		if part == "" {
-+			return false
-+		}
-+		for i := 0; i < len(part); i++ {
-+			if part[i] < '0' || part[i] > '9' {
-+				return false
+ 	for _, r := range bytesconv.BytesToString(ret) {
+ 		if r > unicode.MaxASCII {
+-			escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r) // Reuse escapeBuf
++			if r > 0xFFFF {
++				r1, r2 := utf16.EncodeRune(r)
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x\\u%04x", r1, r2)
++			} else {
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r)
 +			}
-+		}
-+	}
-+	return true
-+}
+ 			buffer.Write(escapeBuf)
+ 		} else {
+ 			buffer.WriteByte(byte(r))
+diff --git a/render/render_test.go b/render/render_test.go
+index f63878b..0c64327 100644
+--- a/render/render_test.go
++++ b/render/render_test.go
+@@ -5,6 +5,7 @@
+ package render
+ 
+ import (
++	"encoding/json"
+ 	"encoding/xml"
+ 	"errors"
+ 	"html/template"
+@@ -259,6 +260,32 @@ func TestRenderAsciiJSON(t *testing.T) {
+ 	err = (AsciiJSON{data2}).Render(w2)
+ 	require.NoError(t, err)
+ 	assert.Equal(t, "3.1415926", w2.Body.String())
 +
-+func isHostnameRFC1123String(s string) bool {
-+	if !hostnameRegexRFC1123().MatchString(s) {
-+		return false
-+	}
-+	if isFourPartDottedDecimal(s) {
-+		ip := net.ParseIP(s)
-+		return ip != nil && ip.To4() != nil
-+	}
-+	return true
-+}
++	t.Run("nonBMP", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "😀"}
 +
- func isHostnameRFC1123(fl FieldLevel) bool {
--	return hostnameRegexRFC1123().MatchString(fl.Field().String())
-+	return isHostnameRFC1123String(fl.Field().String())
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Equal(t, `{"msg":"\ud83d\ude00"}`, w.Body.String())
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "😀", decoded["msg"])
++	})
++
++	t.Run("supplementaryBoundary", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "a\U00010000b"}
++
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Contains(t, w.Body.String(), `\ud800\udc00`)
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "a\U00010000b", decoded["msg"])
++	})
  }
  
- func isFQDN(fl FieldLevel) bool {
- 	val := fl.Field().String()
- 
- 	if val == "" {
- 		return false
- 	}
- 
- 	return fqdnRegexRFC1123().MatchString(val)
-@@ -3010,21 +3039,21 @@ func isHostnamePort(fl FieldLevel) bool {
- 	}
- 	// Port must be a iny <= 65535.
- 	if portNum, err := strconv.ParseInt(
- 		port, 10, 32,
- 	); err != nil || portNum > 65535 || portNum < 1 {
- 		return false
- 	}
- 
- 	// If host is specified, it should match a DNS name
- 	if host != "" {
--		return hostnameRegexRFC1123().MatchString(host)
-+		return isHostnameRFC1123String(host)
- 	}
- 	return true
- }
- 
- // IsPort validates if the current field's value represents a valid port
- func isPort(fl FieldLevel) bool {
- 	val := fl.Field().Uint()
- 
- 	return val >= 1 && val <= 65535
- }
-diff --git a/validator_test.go b/validator_test.go
-index 67d3f83..e6536dc 100644
---- a/validator_test.go
-+++ b/validator_test.go
-@@ -10994,20 +10994,25 @@ func TestHostnameRFC1123Validation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 		{"", false},
- 		{"-example.com", false},
- 		{"example-.com", false},
- 		{"foo.-bar.com", false},
- 		{"foo.bar-.com", false},
- 		{"example..com", false},
-@@ -11054,20 +11059,25 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 	}
- 
- 	validate := New()
- 	validate.RegisterAlias("hostname", "hostname_rfc1123")
- 
- 	for i, test := range tests {
-@@ -13513,20 +13523,21 @@ func Test_hostnameport_validator(t *testing.T) {
- 
- 	type testInput struct {
- 		data     string
- 		expected bool
- 	}
- 	testData := []testInput{
- 		{"bad..domain.name:234", false},
- 		{"extra.dot.com.", false},
- 		{"localhost:1234", true},
- 		{"192.168.1.1:1234", true},
-+		{"277.168.0.1:8080", false},
- 		{":1234", true},
- 		{"domain.com:1334", true},
- 		{"this.domain.com:234", true},
- 		{"domain:75000", false},
- 		{"missing.port", false},
- 	}
- 	for _, td := range testData {
- 		h := Host{Addr: td.data}
- 		v := New()
- 		err := v.Struct(h)
+ func TestRenderAsciiJSONFail(t *testing.T) {
 ```
 ```
-- Raw LLM response saved (4124 chars) → /Users/gaurav/Desktop/pocketfmTask/output/code_generator_raw.txt
-- Patch stats: 158 lines, 4100 chars
-- Hunks: 5, files: 2
-- ⚠️ Patch diagnosis: ["HUNK_1_0_OLD_COUNT_MISMATCH: header says -22 lines, found 1 '-' lines", "HUNK_1_0_NEW_COUNT_MISMATCH: header says +51 lines, found 45 on new side (30 '+', 15 ' ')", "HUNK_1_1_OLD_COUNT_MISMATCH: header says -21 lines, found 1 '-' lines", "HUNK_1_1_NEW_COUNT_MISMATCH: header says +21 lines, found 19 on new side (1 '+', 18 ' ')", "HUNK_2_0_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines", "HUNK_2_0_NEW_COUNT_MISMATCH: header says +25 lines, found 26 on new side (5 '+', 21 ' ')", "HUNK_2_1_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines", "HUNK_2_1_NEW_COUNT_MISMATCH: header says +25 lines, found 24 on new side (5 '+', 19 ' ')", "HUNK_2_2_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines"]
+- Raw LLM response saved (2323 chars) → /Users/gaurav/Desktop/alaph/output/code_generator_raw.txt
+- Patch stats: 76 lines, 2307 chars
+- Hunks: 4, files: 2
+- ⚠️ Patch diagnosis: ["HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines", "HUNK_1_1_OLD_COUNT_MISMATCH: header says -11 lines, found 2 '-' lines", "HUNK_1_1_NEW_COUNT_MISMATCH: header says +16 lines, found 15 on new side (7 '+', 8 ' ')", "HUNK_2_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines", "HUNK_2_0_NEW_COUNT_MISMATCH: header says +7 lines, found 6 on new side (1 '+', 5 ' ')", "HUNK_2_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines"]
 
 ### Patch summary
 
-**2 file(s)** · **+42** / **-2** lines · tests: **yes**
+**2 file(s)** · **+35** / **-2** lines · tests: **yes**
 
-Files: `baked_in.go, validator_test.go`
+Files: `render/json.go, render/render_test.go`
 
-Saved: `/Users/gaurav/Desktop/pocketfmTask/output/fix.patch`
+Saved: `/Users/gaurav/Desktop/alaph/output/fix.patch`
 
 ```diff
-diff --git a/baked_in.go b/baked_in.go
-index 679729a..9fcade1 100644
---- a/baked_in.go
-+++ b/baked_in.go
-@@ -2882,22 +2882,51 @@ func isIP6Addr(fl FieldLevel) bool {
+diff --git a/render/json.go b/render/json.go
+index 2f98676..5717181 100644
+--- a/render/json.go
++++ b/render/json.go
+@@ -10,6 +10,7 @@ import (
+ 	"html/template"
+ 	"net/http"
+ 	"unicode"
++	"unicode/utf16"
 
- 	ip := net.ParseIP(val)
+ 	"github.com/gin-gonic/gin/codec/json"
+ 	"github.com/gin-gonic/gin/internal/bytesconv"
+@@ -160,11 +161,16 @@ func (r AsciiJSON) Render(w http.ResponseWriter) error {
+ 	}
 
- 	return ip != nil && ip.To4() == nil
- }
+ 	var buffer bytes.Buffer
+-	escapeBuf := make([]byte, 0, 6) // Preallocate 6 bytes for Unicode escape sequences
++	escapeBuf := make([]byte, 0, 12) // Preallocate 12 bytes for Unicode escape sequences (up to two per rune)
 
- func isHostnameRFC952(fl FieldLevel) bool {
- 	return hostnameRegexRFC952().MatchString(fl.Field().String())
- }
-
-+func isFourPartDottedDecimal(s string) bool {
-+	parts := strings.Split(s, ".")
-+	if len(parts) != 4 {
-+		return false
-+	}
-+	for _, part := range parts {
-+		if part == "" {
-+			return false
-+		}
-+		for i := 0; i < len(part); i++ {
-+			if part[i] < '0' || part[i] > '9' {
-+				return false
+ 	for _, r := range bytesconv.BytesToString(ret) {
+ 		if r > unicode.MaxASCII {
+-			escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r) // Reuse escapeBuf
++			if r > 0xFFFF {
++				r1, r2 := utf16.EncodeRune(r)
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x\\u%04x", r1, r2)
++			} else {
++				escapeBuf = fmt.Appendf(escapeBuf[:0], "\\u%04x", r)
 +			}
-+		}
-+	}
-+	return true
-+}
+ 			buffer.Write(escapeBuf)
+ 		} else {
+ 			buffer.WriteByte(byte(r))
+diff --git a/render/render_test.go b/render/render_test.go
+index f63878b..0c64327 100644
+--- a/render/render_test.go
++++ b/render/render_test.go
+@@ -5,6 +5,7 @@
+ package render
+
+ import (
++	"encoding/json"
+ 	"encoding/xml"
+ 	"errors"
+ 	"html/template"
+@@ -259,6 +260,32 @@ func TestRenderAsciiJSON(t *testing.T) {
+ 	err = (AsciiJSON{data2}).Render(w2)
+ 	require.NoError(t, err)
+ 	assert.Equal(t, "3.1415926", w2.Body.String())
 +
-+func isHostnameRFC1123String(s string) bool {
-+	if !hostnameRegexRFC1123().MatchString(s) {
-+		return false
-+	}
-+	if isFourPartDottedDecimal(s) {
-+		ip := net.ParseIP(s)
-+		return ip != nil && ip.To4() != nil
-+	}
-+	return true
-+}
++	t.Run("nonBMP", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "😀"}
 +
- func isHostnameRFC1123(fl FieldLevel) bool {
--	return hostnameRegexRFC1123().MatchString(fl.Field().String())
-+	return isHostnameRFC1123String(fl.Field().String())
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Equal(t, `{"msg":"\ud83d\ude00"}`, w.Body.String())
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "😀", decoded["msg"])
++	})
++
++	t.Run("supplementaryBoundary", func(t *testing.T) {
++		w := httptest.NewRecorder()
++		data := map[string]string{"msg": "a\U00010000b"}
++
++		err := (AsciiJSON{data}).Render(w)
++		require.NoError(t, err)
++		assert.Contains(t, w.Body.String(), `\ud800\udc00`)
++
++		var decoded map[string]string
++		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &decoded))
++		assert.Equal(t, "a\U00010000b", decoded["msg"])
++	})
  }
 
- func isFQDN(fl FieldLevel) bool {
- 	val := fl.Field().String()
-
- 	if val == "" {
- 		return false
- 	}
-
- 	return fqdnRegexRFC1123().MatchString(val)
-@@ -3010,21 +3039,21 @@ func isHostnamePort(fl FieldLevel) bool {
- 	}
- 	// Port must be a iny <= 65535.
- 	if portNum, err := strconv.ParseInt(
- 		port, 10, 32,
- 	); err != nil || portNum > 65535 || portNum < 1 {
- 		return false
- 	}
-
- 	// If host is specified, it should match a DNS name
- 	if host != "" {
--		return hostnameRegexRFC1123().MatchString(host)
-+		return isHostnameRFC1123String(host)
- 	}
- 	return true
- }
-
- // IsPort validates if the current field's value represents a valid port
- func isPort(fl FieldLevel) bool {
- 	val := fl.Field().Uint()
-
- 	return val >= 1 && val <= 65535
- }
-diff --git a/validator_test.go b/validator_test.go
-index 67d3f83..e6536dc 100644
---- a/validator_test.go
-+++ b/validator_test.go
-@@ -10994,20 +10994,25 @@ func TestHostnameRFC1123Validation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 		{"", false},
- 		{"-example.com", false},
- 		{"example-.com", false},
- 		{"foo.-bar.com", false},
- 		{"foo.bar-.com", false},
- 		{"example..com", false},
-@@ -11054,20 +11059,25 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {
- 		{"example", true},
- 		{"1.foo.com", true},
- 		{"test.example.com.", false},
- 		{"example.com.", false},
- 		{"example24.com.", false},
- 		{"test.example24.com.", false},
- 		{"test24.example24.com.", false},
- 		{"example.", false},
- 		{"test_example", false},
- 		{"192.168.0.1", true},
-+		{"1.2.3.4", true},
-+		{"277.168.0.1", false},
-+		{"256.1.1.1", false},
-+		{"123.456.789.0", false},
-+		{"01.2.3.4", false},
- 		{"email@example.com", false},
- 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
- 		{"2001:cdba:0:0:0:0:3257:9652", false},
- 		{"2001:cdba::3257:9652", false},
- 	}
-
- 	validate := New()
- 	validate.RegisterAlias("hostname", "hostname_rfc1123")
-
- 	for i, test := range tests {
-@@ -13513,20 +13523,21 @@ func Test_hostnameport_validator(t *testing.T) {
-
- 	type testInput struct {
- 		data     string
- 		expected bool
- 	}
- 	testData := []testInput{
- 		{"bad..domain.name:234", false},
- 		{"extra.dot.com.", false},
- 		{"localhost:1234", true},
- 		{"192.168.1.1:1234", true},
-+		{"277.168.0.1:8080", false},
- 		{":1234", true},
- 		{"domain.com:1334", true},
- 		{"this.domain.com:234", true},
- 		{"domain:75000", false},
- 		{"missing.port", false},
- 	}
- 	for _, td := range testData {
- 		h := Host{Addr: td.data}
- 		v := New()
- 		err := v.Struct(h)
+ func TestRenderAsciiJSONFail(t *testing.T) {
 
 ```
 - **Patch includes *_test.go changes:** True
 - Validation attempt 1/3
 - Patch applied successfully
-- Running tests for packages: ['./']
--   go test ./
+- Running tests for packages: ['./render']
+-   go test ./render
 
 #### Test output (attempt 1)
 
 ```
-=== go test ./ (exit 0) ===
-ok  	github.com/go-playground/validator/v10	0.298s
+=== go test ./render (exit 0) ===
+ok  	github.com/gin-gonic/gin/render	0.311s
 ```
 - Tests PASSED — fix verified
-- Validation report → /Users/gaurav/Desktop/pocketfmTask/output/validation_report.json
+- Validation report → /Users/gaurav/Desktop/alaph/output/validation_report.json
 - **git apply:** OK
 - **has tests:** True
 - **go test:** PASS
@@ -821,40 +703,38 @@ ok  	github.com/go-playground/validator/v10	0.298s
 #### Test output
 
 ```
-=== go test ./ (exit 0) ===
-ok  	github.com/go-playground/validator/v10	0.298s
+=== go test ./render (exit 0) ===
+ok  	github.com/gin-gonic/gin/render	0.311s
 ```
-- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator
-- LLM `pr_writer` · `cursor/composer-2.5` (7.3s) · 1837 chars
+- Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+- LLM `pr_writer` · `cursor/composer-2.5` (7.2s) · 1509 chars
 
 #### pr_writer — response
 
 ```
-# Reject invalid IPv4-shaped hostnames in RFC1123 validation
+# Fix AsciiJSON non-BMP escaping with UTF-16 surrogate pairs
 
 ## Summary
 
-`hostname_rfc1123` (and the `hostname` alias) accepted dotted-decimal strings such as `277.168.0.1` because the RFC 1123 regex treats each segment as a valid numeric label, without checking whether the value is syntactically valid IPv4. Per RFC 1123, hostnames in dotted-decimal form are only allowed when they represent a valid IPv4 address. This PR adds a narrow pre-check: when input matches a four-part all-decimal pattern, it must pass `net.ParseIP` as IPv4; otherwise the existing regex match is sufficient. The same logic is applied in `isHostnamePort` so invalid IPv4-shaped hosts are rejected there too.
+`render.AsciiJSON` escaped every non-ASCII rune with `\u%04x`, but `%04x` only sets a minimum width. Supplementary-plane code points (e.g. emoji) produced 5+ hex digits in a single `\u` token, which is invalid per RFC 8259 and silently corrupts the decoded string while still producing syntactically valid JSON. This PR branches on BMP vs non-BMP runes: BMP characters keep the existing single `\uXXXX` escape, and supplementary characters are encoded as a UTF-16 surrogate pair via `unicode/utf16.EncodeRune`.
 
 ## Changes
 
-- Add `isFourPartDottedDecimal` to detect exactly four non-empty, all-digit dot-separated labels.
-- Add `isHostnameRFC1123String` to combine the RFC 1123 regex with an IPv4 octet check for four-part dotted-decimal input only.
-- Update `isHostnameRFC1123` and `isHostnamePort` to use `isHostnameRFC1123String` instead of the regex alone.
-- Extend `TestHostnameRFC1123Validation` and `TestHostnameRFC1123AliasValidation` with invalid cases (`277.168.0.1`, `256.1.1.1`, `123.456.789.0`, `01.2.3.4`) and valid `1.2.3.4`.
-- Add `277.168.0.1:8080` as a failing case in `Test_hostnameport_validator`.
-- No changes to `regexes.go` (regex-only fixes are insufficient per maintainer feedback).
+- Import `unicode/utf16` in `render/json.go` and emit two `\u%04x` escapes for runes above U+FFFF
+- Keep single `\u%04x` escaping for BMP runes (U+0080–U+FFFF); existing behavior for `GO语言`, `<br>`, etc. is unchanged
+- Increase `escapeBuf` preallocation from 6 to 12 bytes to cover two escape sequences per rune
+- Add `nonBMP` subtest to `TestRenderAsciiJSON` asserting wire format `{"msg":"\ud83d\ude00"}` and round-trip via `json.Unmarshal`
+- Add `supplementaryBoundary` subtest for U+10000 (`\ud800\udc00`) with round-trip assertion
 
 ## Test plan
 
-- [x] `go test ./` — all tests pass (`ok github.com/go-playground/validator/v10 0.298s`)
-- [x] `TestHostnameRFC1123Validation` — invalid IPv4-shaped hostnames fail; valid cases including `192.168.0.1` and `1.2.3.4` still pass
-- [x] `TestHostnameRFC1123AliasValidation` — same coverage via `hostname` alias
-- [x] `Test_hostnameport_validator` — `277.168.0.1:8080` rejected
+- [x] `go test ./render/...` — pass (`ok github.com/gin-gonic/gin/render 0.311s`)
+- [x] `TestRenderAsciiJSON` — existing BMP cases unchanged; new `nonBMP` and `supplementaryBoundary` subtests cover emoji and first supplementary code point
+- [x] `TestRenderAsciiJSONFail` — unchanged (marshal error path)
 
 ## Closes
 
-https://github.com/go-playground/validator/issues/1561
+https://github.com/gin-gonic/gin/issues/4688
 ```
 
 ---
@@ -865,12 +745,12 @@ https://github.com/go-playground/validator/issues/1561
 
 | Key | Value |
 |-----|-------|
-| issue | https://github.com/go-playground/validator/issues/1561 |
-| title | [Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check |
+| issue | https://github.com/gin-gonic/gin/issues/4688 |
+| title | AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes |
 | validation_passed | True |
-| patch | /Users/gaurav/Desktop/pocketfmTask/output/fix.patch |
-| plan | /Users/gaurav/Desktop/pocketfmTask/output/plan.md |
-| pr_summary | /Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md |
-| dashboard | /Users/gaurav/Desktop/pocketfmTask/logs/dashboard.md |
+| patch | /Users/gaurav/Desktop/alaph/output/fix.patch |
+| plan | /Users/gaurav/Desktop/alaph/output/plan.md |
+| pr_summary | /Users/gaurav/Desktop/alaph/output/pr_summary.md |
+| dashboard | /Users/gaurav/Desktop/alaph/logs/dashboard.md |
 
-**Finished:** 2026-06-04T15:58:19.493320
+**Finished:** 2026-06-04T17:05:24.681810

@@ -1,5 +1,9 @@
 const POLL_MS = 1000;
 let lastUpdated = "";
+let lastPayload = null;
+let clientElapsedBase = 0;
+let clientElapsedAt = 0;
+let elapsedTicker = null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -18,15 +22,73 @@ function renderSteps(steps) {
   }
   el.innerHTML = steps
     .map(
-      (s) => `
+      (s) => {
+        const spin =
+          s.status === "running"
+            ? '<span class="step-spinner" aria-hidden="true"></span>'
+            : "";
+        return `
     <div class="step-card ${esc(s.status)}">
       <div class="id">Step ${esc(s.id)}/6</div>
-      <div class="title">${esc(s.title)}</div>
+      <div class="title">${spin}${esc(s.title)}</div>
       <div class="detail">${esc(s.detail || s.description || "")}</div>
       <span class="badge ${esc(s.status)}">${esc(s.status)}</span>
-    </div>`
+    </div>`;
+      }
     )
     .join("");
+}
+
+function setHeartbeat(ok) {
+  const el = $("#heartbeat");
+  if (!el) return;
+  el.classList.toggle("ok", ok);
+  el.classList.toggle("err", !ok);
+}
+
+function startElapsedTicker() {
+  if (elapsedTicker) return;
+  elapsedTicker = setInterval(() => {
+    if (!clientElapsedAt) return;
+    const sec = clientElapsedBase + Math.floor((Date.now() - clientElapsedAt) / 1000);
+    $("#elapsed").textContent = `${sec}s`;
+  }, 1000);
+}
+
+function updateLogTail(text) {
+  const logEl = $("#log-tail");
+  if (!logEl) return;
+  const prev = logEl.textContent;
+  if (text === prev) return;
+  logEl.textContent = text || "(no log yet)";
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function applyPayload(data) {
+  lastPayload = data;
+  $("#clock").textContent = new Date(data.updated_at).toLocaleTimeString();
+  clientElapsedBase = data.elapsed_sec ?? 0;
+  clientElapsedAt = Date.now();
+  $("#elapsed").textContent = `${clientElapsedBase}s`;
+  startElapsedTicker();
+
+  const running = data.any_running || (data.steps || []).some((s) => s.status === "running");
+  $("#poll-status").textContent = running ? "running" : "live";
+  $("#poll-status").className = `pill ${running ? "run" : "ok"}`;
+
+  renderSteps(data.steps);
+  renderEvents(data.events);
+  renderArtifacts(data.artifacts);
+
+  const f = data.files || {};
+  renderIssue(f);
+  renderContext(f);
+  renderPlan(f.plan_md);
+  renderPr(f.pr_summary_md);
+  renderDiff(f.patch_files, f.patch_stats, f.patch_raw);
+  renderValidation(f);
+
+  updateLogTail(data.log_tail);
 }
 
 function renderEvents(events) {
@@ -208,40 +270,45 @@ function setupTabs() {
 }
 
 async function poll() {
-  if (!$("#auto-refresh").checked) return;
+  if (!$("#auto-refresh").checked) {
+    setHeartbeat(false);
+    $("#poll-ago").textContent = "paused";
+    return;
+  }
   try {
     const res = await fetch("/api/state", { cache: "no-store" });
     if (!res.ok) throw new Error(res.statusText);
     const data = await res.json();
-    $("#poll-status").textContent = "live";
-    $("#poll-status").className = "pill ok";
+    setHeartbeat(true);
+    $("#poll-ago").textContent = "just now";
 
-    if (data.updated_at !== lastUpdated) {
+    const logChanged =
+      !lastPayload || (data.log_tail || "") !== (lastPayload.log_tail || "");
+    const structuralChange = data.updated_at !== lastUpdated;
+
+    if (structuralChange || logChanged || !lastPayload) {
       lastUpdated = data.updated_at;
-      $("#clock").textContent = new Date(data.updated_at).toLocaleTimeString();
-      $("#elapsed").textContent = `${data.elapsed_sec ?? 0}s`;
-
-      renderSteps(data.steps);
-      renderEvents(data.events);
-      renderArtifacts(data.artifacts);
-
-      const f = data.files || {};
-      renderIssue(f);
-      renderContext(f);
-      renderPlan(f.plan_md);
-      renderPr(f.pr_summary_md);
-      renderDiff(f.patch_files, f.patch_stats, f.patch_raw);
-      renderValidation(f);
-
-      $("#log-tail").textContent = data.log_tail || "(no log yet)";
-      const logEl = $("#log-tail");
-      logEl.scrollTop = logEl.scrollHeight;
+      applyPayload(data);
+    } else if (lastPayload) {
+      clientElapsedBase = data.elapsed_sec ?? clientElapsedBase;
+      clientElapsedAt = Date.now();
+      updateLogTail(data.log_tail);
     }
   } catch (e) {
+    setHeartbeat(false);
     $("#poll-status").textContent = "offline";
     $("#poll-status").className = "pill err";
+    $("#poll-ago").textContent = "retrying…";
   }
 }
+
+setInterval(() => {
+  if (!lastUpdated || !$("#auto-refresh").checked) return;
+  const ago = Math.floor((Date.now() - new Date(lastUpdated).getTime()) / 1000);
+  if (ago < 3) $("#poll-ago").textContent = "just now";
+  else if (ago < 60) $("#poll-ago").textContent = `${ago}s ago`;
+  else $("#poll-ago").textContent = `${Math.floor(ago / 60)}m ago`;
+}, 1000);
 
 setupTabs();
 poll();
