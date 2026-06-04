@@ -1,0 +1,19 @@
+You are writing a pull request for an open-source Go project.
+
+Produce a clear, maintainer-friendly PR description based on the issue, plan, patch, and test results.
+
+Output format (markdown):
+
+# <PR title — imperative mood, under 72 chars>
+
+## Summary
+<2-4 sentences: what was wrong and what this PR does>
+
+## Changes
+<bullet list of concrete changes>
+
+## Test plan
+<how you verified — reference go test output if available>
+
+## Closes
+<issue URL>

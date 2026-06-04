@@ -1,0 +1,9 @@
+{
+  "issue": "https://github.com/go-playground/validator/issues/1561",
+  "title": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check",
+  "validation_passed": true,
+  "patch": "/Users/gaurav/Desktop/pocketfmTask/output/fix.patch",
+  "plan": "/Users/gaurav/Desktop/pocketfmTask/output/plan.md",
+  "pr_summary": "/Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md",
+  "dashboard": "/Users/gaurav/Desktop/pocketfmTask/logs/dashboard.md"
+}

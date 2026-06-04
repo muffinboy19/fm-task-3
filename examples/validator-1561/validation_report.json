@@ -1,0 +1,16 @@
+{
+  "go_installed": true,
+  "go_binary": "/opt/homebrew/bin/go",
+  "patch_has_tests": true,
+  "files_changed": [
+    "baked_in.go",
+    "validator_test.go"
+  ],
+  "packages_tested": [
+    "./"
+  ],
+  "apply_passed": true,
+  "tests_passed": true,
+  "overall_passed": true,
+  "test_output_preview": "=== go test ./ (exit 0) ===\nok  \tgithub.com/go-playground/validator/v10\t0.298s"
+}

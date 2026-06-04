@@ -1,0 +1,67 @@
+{
+  "guardrails": {
+    "prefer": [
+      "clear reproduction in issue body",
+      "localized fix (1-3 files)",
+      "bug label or explicit bug report",
+      "has failing test example or expected/actual"
+    ],
+    "avoid": [
+      "security",
+      "CVE",
+      "architectural",
+      "rewrite",
+      "breaking change",
+      "design proposal",
+      "dependencies upgrade",
+      "linter false positive",
+      "cgo",
+      "unclear maintainer decision",
+      "help wanted investigation only"
+    ],
+    "max_comments_for_ambiguity": 30
+  },
+  "recommended": [
+    {
+      "repo": "gin-gonic/gin",
+      "url": "https://github.com/gin-gonic/gin/issues/4688",
+      "title": "AsciiJSON non-BMP malformed \\u escapes",
+      "size": "small",
+      "status": "validated_by_agent",
+      "notes": "Already run successfully; compare to PR #4627"
+    },
+    {
+      "repo": "go-playground/validator",
+      "url": "https://github.com/go-playground/validator/issues/1561",
+      "title": "hostname_rfc1123: reject invalid IPv4-looking hostnames",
+      "size": "small",
+      "status": "validated_by_agent",
+      "notes": "277.168.0.1 should fail; RFC1123 dotted-decimal hostnames invalid"
+    },
+    {
+      "repo": "spf13/cobra",
+      "url": "https://github.com/spf13/cobra/issues/2358",
+      "title": "Single-hyphen long flags mistreated (-name vs --name)",
+      "size": "medium",
+      "status": "validated_by_agent",
+      "notes": "Flag parsing; may touch pflag integration — run after validator"
+    }
+  ],
+  "avoid_examples": [
+    {
+      "repo": "golangci/golangci-lint",
+      "url": "https://github.com/golangci/golangci-lint/issues/6420",
+      "reason": "linter false positive / dependency"
+    },
+    {
+      "repo": "gin-gonic/gin",
+      "url": "https://github.com/gin-gonic/gin/issues/4690",
+      "reason": "security advisory process — not a code fix"
+    },
+    {
+      "repo": "go-playground/validator",
+      "url": "https://github.com/go-playground/validator/issues/593",
+      "reason": "locale investigation, unclear scope"
+    }
+  ]
+}

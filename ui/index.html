@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>go-issue-solver — Live Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>go-issue-solver</h1>
+      <span class="subtitle">Live pipeline dashboard</span>
+    </div>
+    <div class="meta">
+      <span id="clock" class="pill">—</span>
+      <span id="elapsed" class="pill">0s</span>
+      <span id="poll-status" class="pill ok">live</span>
+      <label class="auto-refresh">
+        <input type="checkbox" id="auto-refresh" checked /> Auto-refresh
+      </label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel steps-panel">
+      <h2>Pipeline</h2>
+      <div id="steps" class="steps"></div>
+    </section>
+
+    <section class="panel main-panel">
+      <nav class="tabs" id="tabs">
+        <button type="button" data-tab="issue" class="active">Issue</button>
+        <button type="button" data-tab="context">Context</button>
+        <button type="button" data-tab="plan">Plan</button>
+        <button type="button" data-tab="diff">Diff</button>
+        <button type="button" data-tab="validation">Validation</button>
+        <button type="button" data-tab="pr">PR</button>
+        <button type="button" data-tab="logs">Logs</button>
+      </nav>
+
+      <div class="tab-panels">
+        <article id="tab-issue" class="tab active"></article>
+        <article id="tab-context" class="tab"></article>
+        <article id="tab-plan" class="tab"><pre id="plan-body" class="md-body"></pre></article>
+        <article id="tab-diff" class="tab">
+          <div id="patch-stats" class="patch-stats"></div>
+          <div id="diff-viewer"></div>
+        </article>
+        <article id="tab-validation" class="tab"></article>
+        <article id="tab-pr" class="tab"><pre id="pr-body" class="md-body"></pre></article>
+        <article id="tab-logs" class="tab">
+          <pre id="log-tail" class="log-tail"></pre>
+        </article>
+      </div>
+    </section>
+
+    <aside class="panel side-panel">
+      <h2>Events</h2>
+      <ul id="events" class="events"></ul>
+      <h2>Artifacts</h2>
+      <ul id="artifacts" class="artifacts"></ul>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

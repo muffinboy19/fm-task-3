@@ -1,0 +1,489 @@
+{
+  "updated_at": "2026-06-04T15:58:19.492101",
+  "elapsed_sec": 193,
+  "success": true,
+  "steps": [
+    {
+      "id": "1",
+      "title": "Issue understanding",
+      "description": "Fetch GitHub issue",
+      "status": "ok",
+      "detail": "[Bug]: hostname_rfc1123 validation does not enforc... | bug | confidence=high"
+    },
+    {
+      "id": "2",
+      "title": "Context builder",
+      "description": "Path anchors + curated grep + slice",
+      "status": "ok",
+      "detail": "6 functions in 6 file(s)"
+    },
+    {
+      "id": "3",
+      "title": "Code reasoning",
+      "description": "LLM fix plan",
+      "status": "ok",
+      "detail": "plan.md (4552 chars)"
+    },
+    {
+      "id": "4",
+      "title": "Code generator",
+      "description": "LLM unified diff",
+      "status": "ok",
+      "detail": "/Users/gaurav/Desktop/pocketfmTask/output/fix.patch"
+    },
+    {
+      "id": "5",
+      "title": "Validator",
+      "description": "git apply + go test",
+      "status": "ok",
+      "detail": "Patch applied + tests passed"
+    },
+    {
+      "id": "6",
+      "title": "PR writer",
+      "description": "LLM PR summary",
+      "status": "ok",
+      "detail": "/Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md"
+    }
+  ],
+  "events": [
+    "`15:55:05` Step 1 started: Issue understanding",
+    "`15:55:37` Artifact: Issue raw bundle → see issue_raw.json",
+    "`15:55:37` Artifact: Issue understanding → see issue_understanding.json",
+    "`15:55:37` Step 1 OK — [Bug]: hostname_rfc1123 validation does not enforc... | bug | confidence=high",
+    "`15:55:37` Artifact: Issue URL → https://github.com/go-playground/validator/issues/1561",
+    "`15:55:37` Artifact: Raw issue JSON → /Users/gaurav/Desktop/pocketfmTask/output/issue_raw.json",
+    "`15:55:37` Artifact: Understanding JSON → /Users/gaurav/Desktop/pocketfmTask/output/issue_understanding.json",
+    "`15:55:37` Step 2 started: Context builder",
+    "`15:55:37` Step 2 OK — 6 functions in 6 file(s)",
+    "`15:55:37` Artifact: Context manifest → /Users/gaurav/Desktop/pocketfmTask/output/context.json",
+    "`15:55:37` Artifact: Conventions → /Users/gaurav/Desktop/pocketfmTask/output/conventions.md",
+    "`15:55:37` Step 3 started: Code reasoning",
+    "`15:57:03` Step 3 OK — plan.md (4552 chars)",
+    "`15:57:03` Artifact: Plan → /Users/gaurav/Desktop/pocketfmTask/output/plan.md",
+    "`15:57:03` Step 4 started: Code generator",
+    "`15:58:11` Warning: Patch diagnosis: [\"HUNK_1_0_OLD_COUNT_MISMATCH: header says -22 lines, found 1 '-' lines\", \"HUNK_1_0_NEW_COUNT_MISMATCH: header says +51 lines, found 45 on new side (30 '+', 15 ' ')\", \"HUNK_1_1_OLD_COUNT_MISMATCH: header says -21 lines, found 1 '-' lines\", \"HUNK_1_1_NEW_COUNT_MISMATCH: header says +21 lines, found 19 on new side (1 '+', 18 ' ')\", \"HUNK_2_0_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\", \"HUNK_2_0_NEW_COUNT_MISMATCH: header says +25 lines, found 26 on new side (5 '+', 21 ' ')\", \"HUNK_2_1_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\", \"HUNK_2_1_NEW_COUNT_MISMATCH: header says +25 lines, found 24 on new side (5 '+', 19 ' ')\", \"HUNK_2_2_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\"]",
+    "`15:58:11` Patch: 2 files, +42/-2, tests=True",
+    "`15:58:11` Step 4 OK — /Users/gaurav/Desktop/pocketfmTask/output/fix.patch",
+    "`15:58:11` Artifact: Patch → /Users/gaurav/Desktop/pocketfmTask/output/fix.patch",
+    "`15:58:11` Step 5 started: Validator",
+    "`15:58:12` Artifact: Validation report → /Users/gaurav/Desktop/pocketfmTask/output/validation_report.json",
+    "`15:58:12` Step 5 OK — Patch applied + tests passed",
+    "`15:58:12` Step 6 started: PR writer",
+    "`15:58:19` Step 6 OK — /Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md",
+    "`15:58:19` Artifact: PR summary → /Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md"
+  ],
+  "artifacts": [
+    [
+      "Issue raw bundle",
+      "see issue_raw.json"
+    ],
+    [
+      "Issue understanding",
+      "see issue_understanding.json"
+    ],
+    [
+      "Issue URL",
+      "https://github.com/go-playground/validator/issues/1561"
+    ],
+    [
+      "Raw issue JSON",
+      "/Users/gaurav/Desktop/pocketfmTask/output/issue_raw.json"
+    ],
+    [
+      "Understanding JSON",
+      "/Users/gaurav/Desktop/pocketfmTask/output/issue_understanding.json"
+    ],
+    [
+      "Context manifest",
+      "/Users/gaurav/Desktop/pocketfmTask/output/context.json"
+    ],
+    [
+      "Conventions",
+      "/Users/gaurav/Desktop/pocketfmTask/output/conventions.md"
+    ],
+    [
+      "Plan",
+      "/Users/gaurav/Desktop/pocketfmTask/output/plan.md"
+    ],
+    [
+      "Patch",
+      "/Users/gaurav/Desktop/pocketfmTask/output/fix.patch"
+    ],
+    [
+      "Validation report",
+      "/Users/gaurav/Desktop/pocketfmTask/output/validation_report.json"
+    ],
+    [
+      "PR summary",
+      "/Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md"
+    ]
+  ],
+  "log_path": "/Users/gaurav/Desktop/pocketfmTask/logs/agent_20260604_155505.log",
+  "log_tail": "2026-06-04 15:55:05,504 | INFO     | [?] go-issue-solver started\n2026-06-04 15:55:05,504 | INFO     | **Issue URL:** https://github.com/go-playground/validator/issues/1561\n2026-06-04 15:55:05,504 | INFO     | **Repo path:** /Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:55:05,504 | INFO     | **Output dir:** /Users/gaurav/Desktop/pocketfmTask/output\n2026-06-04 15:55:05,504 | INFO     | **LLM provider:** cursor\n2026-06-04 15:55:05,504 | INFO     | **Dry run:** False\n2026-06-04 15:55:05,504 | INFO     | Resetting repository (git checkout + clean)...\n2026-06-04 15:55:05,537 | INFO     | **Repo clean after reset:** True\n2026-06-04 15:55:05,539 | INFO     | Phase 1a: extracting raw issue from GitHub...\n2026-06-04 15:55:05,539 | DEBUG    | Extracting issue URL: https://github.com/go-playground/validator/issues/1561\n2026-06-04 15:55:05,539 | INFO     | Fetching issue go-playground/validator#1561\n2026-06-04 15:55:05,539 | DEBUG    | GitHub API GET: https://api.github.com/repos/go-playground/validator/issues/1561\n2026-06-04 15:55:06,181 | DEBUG    | GitHub API GET: https://api.github.com/repos/go-playground/validator/issues/1561/comments\n2026-06-04 15:55:06,705 | INFO     | Fetched issue + 0 comment(s)\n2026-06-04 15:55:06,705 | INFO     | **Title:** [Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check\n2026-06-04 15:55:06,705 | INFO     | **Labels:** ['bug']\n2026-06-04 15:55:06,705 | INFO     | **Identifiers:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname']\n2026-06-04 15:55:06,705 | INFO     | **Paths:** ['validator-master/validator_test.go']\n2026-06-04 15:55:06,705 | INFO     | **Error strings:** []\n2026-06-04 15:55:06,705 | INFO     | **Linked issues:** []\n2026-06-04 15:55:06,705 | INFO     | **Search terms:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname', 'validator-master/validator_test.go']\n2026-06-04 15:55:06,705 | DEBUG    | --- Issue body ---\n2026-06-04 15:55:06,706 | INFO     | Phase 1b: structured intake (understanding engine)...\n2026-06-04 15:55:06,766 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:55:37,609 | INFO     | LLM `issue_understanding` · `cursor/composer-2.5` (30.8s) · 1353 chars\n2026-06-04 15:55:37,609 | DEBUG    | --- issue_understanding — response ---\n2026-06-04 15:55:37,609 | INFO     | Structured intake completed (LLM)\n2026-06-04 15:55:37,609 | INFO     | **Intake source:** llm\n2026-06-04 15:55:37,610 | INFO     | **Type:** bug\n2026-06-04 15:55:37,610 | INFO     | **Confidence:** high\n2026-06-04 15:55:37,610 | INFO     | **Symptom:** 277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC112\n2026-06-04 15:55:37,610 | INFO     | **Expected:** According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168\n2026-06-04 15:55:37,610 | INFO     | **Actual:** 277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects f\n2026-06-04 15:55:37,610 | INFO     | **Open questions:** []\n2026-06-04 15:55:37,610 | INFO     | **Anchor identifiers:** ['Bug', 'IPv4', 'What', 'According', 'However', 'Version', 'Example', 'Code', 'TestHostnameRFC1123Validation', 'FAIL', 'Hostname', 'hostname_rfc1123', 'rfc1123', 'v10']\n2026-06-04 15:55:37,610 | INFO     | **Anchor paths:** ['validator-master/validator_test.go', 'github.com/go-playground/validator/v10']\n2026-06-04 15:55:37,610 | DEBUG    | --- Repro (intake) ---\n2026-06-04 15:55:37,616 | INFO     | **Curated grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s']\n2026-06-04 15:55:37,629 | INFO     | Repo path: /Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:55:37,629 | INFO     | **code-review-graph available:** False\n2026-06-04 15:55:37,629 | INFO     | **Anchor paths:** ['validator-master/validator_test.go']\n2026-06-04 15:55:37,629 | INFO     | **Curated grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s']\n2026-06-04 15:55:37,629 | INFO     | **Error strings:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>', 'FAIL', 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s']\n2026-06-04 15:55:37,633 | DEBUG    |   path anchor: validator_test.go\n2026-06-04 15:55:37,633 | DEBUG    | grep term: '--- FAIL: TestHostnameRFC1123Validation (0.00s)' in 1 dir(s)\n2026-06-04 15:55:37,639 | DEBUG    | grep term: 'v10' in 1 dir(s)\n2026-06-04 15:55:37,661 | DEBUG    | grep term: 'FAIL' in 1 dir(s)\n2026-06-04 15:55:37,679 | DEBUG    | grep term: 'However' in 1 dir(s)\n2026-06-04 15:55:37,690 | DEBUG    | grep term: 'rfc1123' in 1 dir(s)\n2026-06-04 15:55:37,705 | DEBUG    | grep term: 'Hostname' in 1 dir(s)\n2026-06-04 15:55:37,715 | DEBUG    | grep term: 'According' in 1 dir(s)\n2026-06-04 15:55:37,728 | DEBUG    | grep term: 'hostname_rfc1123' in 1 dir(s)\n2026-06-04 15:55:37,739 | DEBUG    | grep term: 'TestHostnameRFC1123Validation' in 1 dir(s)\n2026-06-04 15:55:37,752 | DEBUG    | grep term: 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s' in 1 dir(s)\n2026-06-04 15:55:37,768 | DEBUG    | grep error: '--- FAIL: TestHostnameRFC1123Validation (0.00s)'\n2026-06-04 15:55:37,771 | DEBUG    | grep error: 'validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>'\n2026-06-04 15:55:37,789 | DEBUG    | grep error: 'FAIL'\n2026-06-04 15:55:37,800 | DEBUG    | grep error: 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s'\n2026-06-04 15:55:37,818 | INFO     | Located 6 candidate file(s)\n2026-06-04 15:55:37,818 | DEBUG    |   file: baked_in.go\n2026-06-04 15:55:37,818 | DEBUG    |   file: translations/id/id.go\n2026-06-04 15:55:37,818 | DEBUG    |   file: doc.go\n2026-06-04 15:55:37,818 | DEBUG    |   file: non-standard/validators/notblank.go\n2026-06-04 15:55:37,818 | DEBUG    |   file: _examples/gin-upgrading-overriding/v8_to_v9.go\n2026-06-04 15:55:37,818 | DEBUG    |   file: validator_test.go\n2026-06-04 15:55:37,849 | INFO     | Extracted 6 candidate function(s)\n2026-06-04 15:55:37,849 | DEBUG    |   TestHostnameRFC1123Validation in validator_test.go (lines 10984-11042, score=10)\n2026-06-04 15:55:37,849 | DEBUG    |   TestHostnameRFC1123AliasValidation in validator_test.go (lines 11044-11091, score=7)\n2026-06-04 15:55:37,849 | DEBUG    |   isHostnameRFC1123 in baked_in.go (lines 2892-2894, score=5)\n2026-06-04 15:55:37,849 | DEBUG    |   isHostnameRFC952 in baked_in.go (lines 2888-2890, score=3)\n2026-06-04 15:55:37,849 | DEBUG    |   isHostnamePort in baked_in.go (lines 3005-3023, score=3)\n2026-06-04 15:55:37,849 | DEBUG    |   TestHostnameRFC952Validation in validator_test.go (lines 10929-10982, score=3)\n2026-06-04 15:55:37,849 | DEBUG    | --- Convention snapshot ---\n2026-06-04 15:55:37,849 | DEBUG    | --- Assembled LLM context ---\n2026-06-04 15:55:37,850 | INFO     | **Anchor paths:** ['validator-master/validator_test.go']\n2026-06-04 15:55:37,850 | INFO     | **Grep terms:** ['--- FAIL: TestHostnameRFC1123Validation (0.00s)', 'v10', 'FAIL', 'However', 'rfc1123', 'Hostname', 'According', 'hostname_rfc1123', 'TestHostnameRFC1123Validation', 'FAIL\\tgithub.com/go-playground/validator/v10\\t0.011s']\n2026-06-04 15:55:37,850 | INFO     | **Files in scope:** baked_in.go, translations/id/id.go, doc.go, non-standard/validators/notblank.go, _examples/gin-upgrading-overriding/v8_to_v9.go, validator_test.go\n2026-06-04 15:55:37,853 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:57:03,413 | INFO     | LLM `code_reasoning` · `cursor/composer-2.5` (85.6s) · 4552 chars\n2026-06-04 15:57:03,414 | DEBUG    | --- code_reasoning — response ---\n2026-06-04 15:57:03,427 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:58:11,608 | INFO     | LLM `code_generator` · `cursor/composer-2.5` (68.2s) · 4124 chars\n2026-06-04 15:58:11,608 | DEBUG    | --- code_generator — response ---\n2026-06-04 15:58:11,612 | INFO     | Raw LLM response saved (4124 chars) → /Users/gaurav/Desktop/pocketfmTask/output/code_generator_raw.txt\n2026-06-04 15:58:11,631 | INFO     | Patch stats: 158 lines, 4100 chars\n2026-06-04 15:58:11,631 | INFO     | Hunks: 5, files: 2\n2026-06-04 15:58:11,631 | WARNING  | Patch diagnosis: [\"HUNK_1_0_OLD_COUNT_MISMATCH: header says -22 lines, found 1 '-' lines\", \"HUNK_1_0_NEW_COUNT_MISMATCH: header says +51 lines, found 45 on new side (30 '+', 15 ' ')\", \"HUNK_1_1_OLD_COUNT_MISMATCH: header says -21 lines, found 1 '-' lines\", \"HUNK_1_1_NEW_COUNT_MISMATCH: header says +21 lines, found 19 on new side (1 '+', 18 ' ')\", \"HUNK_2_0_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\", \"HUNK_2_0_NEW_COUNT_MISMATCH: header says +25 lines, found 26 on new side (5 '+', 21 ' ')\", \"HUNK_2_1_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\", \"HUNK_2_1_NEW_COUNT_MISMATCH: header says +25 lines, found 24 on new side (5 '+', 19 ' ')\", \"HUNK_2_2_OLD_COUNT_MISMATCH: header says -20 lines, found 0 '-' lines\"]\n2026-06-04 15:58:11,639 | INFO     | **Patch includes *_test.go changes:** True\n2026-06-04 15:58:11,639 | INFO     | Validation attempt 1/3\n2026-06-04 15:58:11,639 | DEBUG    | Running git apply --check\n2026-06-04 15:58:11,671 | INFO     | Patch applied successfully\n2026-06-04 15:58:11,672 | INFO     | Running tests for packages: ['./']\n2026-06-04 15:58:11,672 | INFO     |   go test ./\n2026-06-04 15:58:12,215 | DEBUG    | --- Test output (attempt 1) ---\n2026-06-04 15:58:12,216 | INFO     | Tests PASSED — fix verified\n2026-06-04 15:58:12,216 | INFO     | Validation report → /Users/gaurav/Desktop/pocketfmTask/output/validation_report.json\n2026-06-04 15:58:12,216 | INFO     | **git apply:** OK\n2026-06-04 15:58:12,216 | INFO     | **has tests:** True\n2026-06-04 15:58:12,216 | INFO     | **go test:** PASS\n2026-06-04 15:58:12,216 | DEBUG    | --- Test output ---\n2026-06-04 15:58:12,220 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/pocketfmTask/validator\n2026-06-04 15:58:19,486 | INFO     | LLM `pr_writer` · `cursor/composer-2.5` (7.3s) · 1837 chars\n2026-06-04 15:58:19,486 | DEBUG    | --- pr_writer — response ---",
+  "output_dir": "/Users/gaurav/Desktop/pocketfmTask/output",
+  "log_dir": "/Users/gaurav/Desktop/pocketfmTask/logs",
+  "files": {
+    "run_summary": {
+      "issue": "https://github.com/go-playground/validator/issues/1561",
+      "title": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check",
+      "validation_passed": true,
+      "patch": "/Users/gaurav/Desktop/pocketfmTask/output/fix.patch",
+      "plan": "/Users/gaurav/Desktop/pocketfmTask/output/plan.md",
+      "pr_summary": "/Users/gaurav/Desktop/pocketfmTask/output/pr_summary.md",
+      "dashboard": "/Users/gaurav/Desktop/pocketfmTask/logs/dashboard.md"
+    },
+    "issue_raw": {
+      "url": "https://github.com/go-playground/validator/issues/1561",
+      "owner": "go-playground",
+      "repo": "validator",
+      "number": 1561,
+      "title": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check",
+      "body": "### What happened?\n\nAccording to rfc1123: \"a valid host name can never have the dotted-decimal form #.#.#.#, since at least the highest-level component label will be alphabetic.\"\nHowever, for example, 277.168.0.1 is returned as a valid host, which is not a valid IPv4 address because of the first octet and should not be a valid hostname based on the rfc quoted above.\n\n### Version\n\nv10\n\n### Example Code\n\n```go\nfunc TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL\n```",
+      "labels": [
+        "bug"
+      ],
+      "state": "open",
+      "comments": [],
+      "full_text": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check\n### What happened?\n\nAccording to rfc1123: \"a valid host name can never have the dotted-decimal form #.#.#.#, since at least the highest-level component label will be alphabetic.\"\nHowever, for example, 277.168.0.1 is returned as a valid host, which is not a valid IPv4 address because of the first octet and should not be a valid hostname based on the rfc quoted above.\n\n### Version\n\nv10\n\n### Example Code\n\n```go\nfunc TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL\n```",
+      "anchors": {
+        "identifiers": [
+          "Bug",
+          "IPv4",
+          "What",
+          "According",
+          "However",
+          "Version",
+          "Example",
+          "Code",
+          "TestHostnameRFC1123Validation",
+          "FAIL",
+          "Hostname"
+        ],
+        "backtick_terms": [],
+        "error_strings": [],
+        "paths": [
+          "validator-master/validator_test.go"
+        ],
+        "linked_issues": [],
+        "stack_frames": []
+      },
+      "code_snippets": [
+        "func TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL"
+      ],
+      "search_terms": [
+        "Bug",
+        "IPv4",
+        "What",
+        "According",
+        "However",
+        "Version",
+        "Example",
+        "Code",
+        "TestHostnameRFC1123Validation",
+        "FAIL",
+        "Hostname",
+        "validator-master/validator_test.go"
+      ],
+      "identifiers": [
+        "Bug",
+        "IPv4",
+        "What",
+        "According",
+        "However",
+        "Version",
+        "Example",
+        "Code",
+        "TestHostnameRFC1123Validation",
+        "FAIL",
+        "Hostname"
+      ],
+      "error_strings": [],
+      "backtick_terms": []
+    },
+    "issue_understanding": {
+      "symptom": "277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC1123 says a valid host name can never have the dotted-decimal form #.#.#.#.",
+      "expected": "According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168.0.1 should not validate as a hostname because it is not a valid IPv4 address (first octet out of range) and should fail hostname_rfc1123 validation.",
+      "actual": "277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects false but validation passes with Error: <nil>.",
+      "repro": "Run TestHostnameRFC1123Validation with param \"277.168.0.1\" and expected false using go-playground/validator v10; test fails at validator-master/validator_test.go:10679.",
+      "anchors": {
+        "identifiers": [
+          "Bug",
+          "IPv4",
+          "What",
+          "According",
+          "However",
+          "Version",
+          "Example",
+          "Code",
+          "TestHostnameRFC1123Validation",
+          "FAIL",
+          "Hostname",
+          "hostname_rfc1123",
+          "rfc1123",
+          "v10"
+        ],
+        "paths": [
+          "validator-master/validator_test.go",
+          "github.com/go-playground/validator/v10"
+        ],
+        "error_strings": [
+          "--- FAIL: TestHostnameRFC1123Validation (0.00s)",
+          "validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>",
+          "FAIL",
+          "FAIL\tgithub.com/go-playground/validator/v10\t0.011s"
+        ],
+        "linked_issues": [],
+        "backtick_terms": [],
+        "stack_frames": []
+      },
+      "type": "bug",
+      "open_questions": [],
+      "confidence": "high",
+      "source": "llm"
+    },
+    "context": {
+      "anchor_paths_used": [
+        "validator-master/validator_test.go"
+      ],
+      "grep_terms_used": [
+        "--- FAIL: TestHostnameRFC1123Validation (0.00s)",
+        "v10",
+        "FAIL",
+        "However",
+        "rfc1123",
+        "Hostname",
+        "According",
+        "hostname_rfc1123",
+        "TestHostnameRFC1123Validation",
+        "FAIL\tgithub.com/go-playground/validator/v10\t0.011s"
+      ],
+      "candidate_files": [
+        "baked_in.go",
+        "translations/id/id.go",
+        "doc.go",
+        "non-standard/validators/notblank.go",
+        "_examples/gin-upgrading-overriding/v8_to_v9.go",
+        "validator_test.go"
+      ],
+      "candidate_function_names": [
+        "TestHostnameRFC1123Validation",
+        "TestHostnameRFC1123AliasValidation",
+        "isHostnameRFC1123",
+        "isHostnameRFC952",
+        "isHostnamePort",
+        "TestHostnameRFC952Validation"
+      ],
+      "convention_snapshot": "- Error wrapping: uses fmt.Errorf with %w verb\n- Receivers: short single-letter names\n- Error returns: (result, error) tuple pattern",
+      "conventions_file": "/Users/gaurav/Desktop/pocketfmTask/output/conventions.md"
+    },
+    "validation": {
+      "go_installed": true,
+      "go_binary": "/opt/homebrew/bin/go",
+      "patch_has_tests": true,
+      "files_changed": [
+        "baked_in.go",
+        "validator_test.go"
+      ],
+      "packages_tested": [
+        "./"
+      ],
+      "apply_passed": true,
+      "tests_passed": true,
+      "overall_passed": true,
+      "test_output_preview": "=== go test ./ (exit 0) ===\nok  \tgithub.com/go-playground/validator/v10\t0.298s"
+    },
+    "plan_md": "## Root cause\n\n`isHostnameRFC1123` only checks `hostnameRegexRFC1123()`, which allows labels to start with digits and treats each dot-separated segment as a hostname label. Strings like `277.168.0.1` match because `277`, `168`, `0`, and `1` are valid numeric labels under that pattern.\n\nThere is no follow-up for IPv4-shaped input. Per RFC 1123, dotted-decimal strings that look like IPv4 must be syntactically valid IPv4 before acceptance (see also issue #1327 in this repo). `net.ParseIP(\"277.168.0.1\")` returns `nil`, but the validator never calls it, so invalid octets still pass.\n\nThe same gap exists in `isHostnamePort`, which reuses `hostnameRegexRFC1123().MatchString(host)` without an octet check.\n\n## Proposed fix\n\n1. **Add a narrow pre-check** in `baked_in.go` (unexported helper, e.g. `isHostnameRFC1123String(s string) bool`) used by both `isHostnameRFC1123` and `isHostnamePort`:\n   - If `hostnameRegexRFC1123()` does not match → return `false`.\n   - If the value is **four-part dotted decimal** (exactly four `.`-separated labels, each non-empty and all ASCII digits) → require `net.ParseIP(s) != nil && ip.To4() != nil`; otherwise return `false`.\n   - Otherwise → return `true` (regex match is sufficient).\n\n2. **Do not change** `hostnameRegexStringRFC1123` in `regexes.go` (maintainer feedback on PR #1562: regex-only fixes are insufficient; broad “digits and dots” checks are error-prone).\n\n3. **Performance:** call `net.ParseIP` only when the four-part all-decimal shape is detected, not for every hostname (e.g. `example.com`, `1.foo.com`).\n\n4. **Keep** `{\"192.168.0.1\", true}` in existing tests — RFC 1123 allows dotted-decimal host identity when it is valid IPv4; `fqdn` already rejects pure numeric forms via its TLD rule.\n\n## Files to change\n\n| File | Change |\n|------|--------|\n| `baked_in.go` | Extend `isHostnameRFC1123`; add small helper(s) for four-part decimal detection + shared RFC1123 hostname validation; update `isHostnamePort` host check to use the same logic |\n| `validator_test.go` | Extend `TestHostnameRFC1123Validation` and `TestHostnameRFC1123AliasValidation`; optionally extend `Test_hostnameport_validator` for invalid IPv4 host |\n\nNo changes to `regexes.go`, translations, or `doc.go` unless you want doc wording about the dotted-decimal rule (optional, out of minimal scope).\n\n## Test strategy\n\nAll tests stay in `validator_test.go`, same table-driven style and assertions (`IsEqual`, `getError`, tag `hostname_rfc1123` / `hostname`).\n\n### `TestHostnameRFC1123Validation`\n\nAdd rows to the existing table (fail before fix, pass after):\n\n| `param` | `expected` | Rationale |\n|---------|------------|-----------|\n| `277.168.0.1` | `false` | Issue repro: invalid first octet |\n| `256.1.1.1` | `false` | Octet > 255 |\n| `123.456.789.0` | `false` | Multiple invalid octets |\n| `01.2.3.4` | `false` | Leading-zero label; `net.ParseIP` rejects |\n\nKeep existing pass cases unchanged, especially:\n\n| `param` | `expected` |\n|---------|------------|\n| `192.168.0.1` | `true` |\n| `1.2.3.4` | `true` (add if missing — valid IPv4, should remain valid) |\n| `example.com`, `1.foo.com` | `true` |\n\n**Before fix:** run `go test -run TestHostnameRFC1123Validation`; new `277.168.0.1` row should fail with `Error: <nil>`.  \n**After fix:** full `go test ./...` (or at least package root tests).\n\n### `TestHostnameRFC1123AliasValidation`\n\nMirror the same new invalid IPv4 rows; keep `192.168.0.1` → `true`; assert tag `hostname` on failures.\n\n### `Test_hostnameport_validator` (recommended)\n\nAdd:\n\n| `data` | `expected` |\n|--------|------------|\n| `277.168.0.1:8080` | `false` |\n| `192.168.1.1:1234` | `true` (existing) |\n\nEnsures `isHostnamePort` stays consistent with `hostname_rfc1123`.\n\n## Risks / assumptions\n\n- **Assumption:** Fix scope is **invalid four-part dotted decimal** (reject when `net.ParseIP` fails), not banning all dotted-decimal hostnames. That matches existing `192.168.0.1` → `true`, RFC 1123 §2 host-identity guidance (#1327), and maintainer PR #1562 direction (four-part check only).\n- **Behavior change:** Values like `01.2.3.4` that match the regex today will start failing; document if that is undesirable.\n- **`isOrigin` (or similar) in `baked_in.go` ~1603** uses `net.ParseIP(hostname) == nil && hostnameRegexRFC1123()` and may still accept `277.168.0.1` via regex alone; out of scope for tag `hostname_rfc1123` unless explicitly requested.\n- **No regex change** avoids breaking numeric multi-label names (`1.foo.com`, `24.example24.com`).\n- Reuse `strings` + `net.ParseIP` only; no new dependencies.",
+    "pr_summary_md": "# Reject invalid IPv4-shaped hostnames in RFC1123 validation\n\n## Summary\n\n`hostname_rfc1123` (and the `hostname` alias) accepted dotted-decimal strings such as `277.168.0.1` because the RFC 1123 regex treats each segment as a valid numeric label, without checking whether the value is syntactically valid IPv4. Per RFC 1123, hostnames in dotted-decimal form are only allowed when they represent a valid IPv4 address. This PR adds a narrow pre-check: when input matches a four-part all-decimal pattern, it must pass `net.ParseIP` as IPv4; otherwise the existing regex match is sufficient. The same logic is applied in `isHostnamePort` so invalid IPv4-shaped hosts are rejected there too.\n\n## Changes\n\n- Add `isFourPartDottedDecimal` to detect exactly four non-empty, all-digit dot-separated labels.\n- Add `isHostnameRFC1123String` to combine the RFC 1123 regex with an IPv4 octet check for four-part dotted-decimal input only.\n- Update `isHostnameRFC1123` and `isHostnamePort` to use `isHostnameRFC1123String` instead of the regex alone.\n- Extend `TestHostnameRFC1123Validation` and `TestHostnameRFC1123AliasValidation` with invalid cases (`277.168.0.1`, `256.1.1.1`, `123.456.789.0`, `01.2.3.4`) and valid `1.2.3.4`.\n- Add `277.168.0.1:8080` as a failing case in `Test_hostnameport_validator`.\n- No changes to `regexes.go` (regex-only fixes are insufficient per maintainer feedback).\n\n## Test plan\n\n- [x] `go test ./` — all tests pass (`ok github.com/go-playground/validator/v10 0.298s`)\n- [x] `TestHostnameRFC1123Validation` — invalid IPv4-shaped hostnames fail; valid cases including `192.168.0.1` and `1.2.3.4` still pass\n- [x] `TestHostnameRFC1123AliasValidation` — same coverage via `hostname` alias\n- [x] `Test_hostnameport_validator` — `277.168.0.1:8080` rejected\n\n## Closes\n\nhttps://github.com/go-playground/validator/issues/1561",
+    "patch_raw": "diff --git a/baked_in.go b/baked_in.go\nindex 679729a..9fcade1 100644\n--- a/baked_in.go\n+++ b/baked_in.go\n@@ -2882,22 +2882,51 @@ func isIP6Addr(fl FieldLevel) bool {\n\n \tip := net.ParseIP(val)\n\n \treturn ip != nil && ip.To4() == nil\n }\n\n func isHostnameRFC952(fl FieldLevel) bool {\n \treturn hostnameRegexRFC952().MatchString(fl.Field().String())\n }\n\n+func isFourPartDottedDecimal(s string) bool {\n+\tparts := strings.Split(s, \".\")\n+\tif len(parts) != 4 {\n+\t\treturn false\n+\t}\n+\tfor _, part := range parts {\n+\t\tif part == \"\" {\n+\t\t\treturn false\n+\t\t}\n+\t\tfor i := 0; i < len(part); i++ {\n+\t\t\tif part[i] < '0' || part[i] > '9' {\n+\t\t\t\treturn false\n+\t\t\t}\n+\t\t}\n+\t}\n+\treturn true\n+}\n+\n+func isHostnameRFC1123String(s string) bool {\n+\tif !hostnameRegexRFC1123().MatchString(s) {\n+\t\treturn false\n+\t}\n+\tif isFourPartDottedDecimal(s) {\n+\t\tip := net.ParseIP(s)\n+\t\treturn ip != nil && ip.To4() != nil\n+\t}\n+\treturn true\n+}\n+\n func isHostnameRFC1123(fl FieldLevel) bool {\n-\treturn hostnameRegexRFC1123().MatchString(fl.Field().String())\n+\treturn isHostnameRFC1123String(fl.Field().String())\n }\n\n func isFQDN(fl FieldLevel) bool {\n \tval := fl.Field().String()\n\n \tif val == \"\" {\n \t\treturn false\n \t}\n\n \treturn fqdnRegexRFC1123().MatchString(val)\n@@ -3010,21 +3039,21 @@ func isHostnamePort(fl FieldLevel) bool {\n \t}\n \t// Port must be a iny <= 65535.\n \tif portNum, err := strconv.ParseInt(\n \t\tport, 10, 32,\n \t); err != nil || portNum > 65535 || portNum < 1 {\n \t\treturn false\n \t}\n\n \t// If host is specified, it should match a DNS name\n \tif host != \"\" {\n-\t\treturn hostnameRegexRFC1123().MatchString(host)\n+\t\treturn isHostnameRFC1123String(host)\n \t}\n \treturn true\n }\n\n // IsPort validates if the current field's value represents a valid port\n func isPort(fl FieldLevel) bool {\n \tval := fl.Field().Uint()\n\n \treturn val >= 1 && val <= 65535\n }\ndiff --git a/validator_test.go b/validator_test.go\nindex 67d3f83..e6536dc 100644\n--- a/validator_test.go\n+++ b/validator_test.go\n@@ -10994,20 +10994,25 @@ func TestHostnameRFC1123Validation(t *testing.T) {\n \t\t{\"example\", true},\n \t\t{\"1.foo.com\", true},\n \t\t{\"test.example.com.\", false},\n \t\t{\"example.com.\", false},\n \t\t{\"example24.com.\", false},\n \t\t{\"test.example24.com.\", false},\n \t\t{\"test24.example24.com.\", false},\n \t\t{\"example.\", false},\n \t\t{\"test_example\", false},\n \t\t{\"192.168.0.1\", true},\n+\t\t{\"1.2.3.4\", true},\n+\t\t{\"277.168.0.1\", false},\n+\t\t{\"256.1.1.1\", false},\n+\t\t{\"123.456.789.0\", false},\n+\t\t{\"01.2.3.4\", false},\n \t\t{\"email@example.com\", false},\n \t\t{\"2001:cdba:0000:0000:0000:0000:3257:9652\", false},\n \t\t{\"2001:cdba:0:0:0:0:3257:9652\", false},\n \t\t{\"2001:cdba::3257:9652\", false},\n \t\t{\"\", false},\n \t\t{\"-example.com\", false},\n \t\t{\"example-.com\", false},\n \t\t{\"foo.-bar.com\", false},\n \t\t{\"foo.bar-.com\", false},\n \t\t{\"example..com\", false},\n@@ -11054,20 +11059,25 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {\n \t\t{\"example\", true},\n \t\t{\"1.foo.com\", true},\n \t\t{\"test.example.com.\", false},\n \t\t{\"example.com.\", false},\n \t\t{\"example24.com.\", false},\n \t\t{\"test.example24.com.\", false},\n \t\t{\"test24.example24.com.\", false},\n \t\t{\"example.\", false},\n \t\t{\"test_example\", false},\n \t\t{\"192.168.0.1\", true},\n+\t\t{\"1.2.3.4\", true},\n+\t\t{\"277.168.0.1\", false},\n+\t\t{\"256.1.1.1\", false},\n+\t\t{\"123.456.789.0\", false},\n+\t\t{\"01.2.3.4\", false},\n \t\t{\"email@example.com\", false},\n \t\t{\"2001:cdba:0000:0000:0000:0000:3257:9652\", false},\n \t\t{\"2001:cdba:0:0:0:0:3257:9652\", false},\n \t\t{\"2001:cdba::3257:9652\", false},\n \t}\n\n \tvalidate := New()\n \tvalidate.RegisterAlias(\"hostname\", \"hostname_rfc1123\")\n\n \tfor i, test := range tests {\n@@ -13513,20 +13523,21 @@ func Test_hostnameport_validator(t *testing.T) {\n\n \ttype testInput struct {\n \t\tdata     string\n \t\texpected bool\n \t}\n \ttestData := []testInput{\n \t\t{\"bad..domain.name:234\", false},\n \t\t{\"extra.dot.com.\", false},\n \t\t{\"localhost:1234\", true},\n \t\t{\"192.168.1.1:1234\", true},\n+\t\t{\"277.168.0.1:8080\", false},\n \t\t{\":1234\", true},\n \t\t{\"domain.com:1334\", true},\n \t\t{\"this.domain.com:234\", true},\n \t\t{\"domain:75000\", false},\n \t\t{\"missing.port\", false},\n \t}\n \tfor _, td := range testData {\n \t\th := Host{Addr: td.data}\n \t\tv := New()\n \t\terr := v.Struct(h)\n",
+    "patch_files": [
+      {
+        "path": "baked_in.go",
+        "hunks": [
+          {
+            "header": "",
+            "lines": [
+              "--- a/baked_in.go",
+              "+++ b/baked_in.go"
+            ]
+          },
+          {
+            "header": "@@ -2882,22 +2882,51 @@ func isIP6Addr(fl FieldLevel) bool {",
+            "lines": [
+              " \tip := net.ParseIP(val)",
+              " \treturn ip != nil && ip.To4() == nil",
+              " }",
+              " func isHostnameRFC952(fl FieldLevel) bool {",
+              " \treturn hostnameRegexRFC952().MatchString(fl.Field().String())",
+              " }",
+              "+func isFourPartDottedDecimal(s string) bool {",
+              "+\tparts := strings.Split(s, \".\")",
+              "+\tif len(parts) != 4 {",
+              "+\t\treturn false",
+              "+\t}",
+              "+\tfor _, part := range parts {",
+              "+\t\tif part == \"\" {",
+              "+\t\t\treturn false",
+              "+\t\t}",
+              "+\t\tfor i := 0; i < len(part); i++ {",
+              "+\t\t\tif part[i] < '0' || part[i] > '9' {",
+              "+\t\t\t\treturn false",
+              "+\t\t\t}",
+              "+\t\t}",
+              "+\t}",
+              "+\treturn true",
+              "+}",
+              "+",
+              "+func isHostnameRFC1123String(s string) bool {",
+              "+\tif !hostnameRegexRFC1123().MatchString(s) {",
+              "+\t\treturn false",
+              "+\t}",
+              "+\tif isFourPartDottedDecimal(s) {",
+              "+\t\tip := net.ParseIP(s)",
+              "+\t\treturn ip != nil && ip.To4() != nil",
+              "+\t}",
+              "+\treturn true",
+              "+}",
+              "+",
+              " func isHostnameRFC1123(fl FieldLevel) bool {",
+              "-\treturn hostnameRegexRFC1123().MatchString(fl.Field().String())",
+              "+\treturn isHostnameRFC1123String(fl.Field().String())",
+              " }",
+              " func isFQDN(fl FieldLevel) bool {",
+              " \tval := fl.Field().String()",
+              " \tif val == \"\" {",
+              " \t\treturn false",
+              " \t}",
+              " \treturn fqdnRegexRFC1123().MatchString(val)"
+            ]
+          },
+          {
+            "header": "@@ -3010,21 +3039,21 @@ func isHostnamePort(fl FieldLevel) bool {",
+            "lines": [
+              " \t}",
+              " \t// Port must be a iny <= 65535.",
+              " \tif portNum, err := strconv.ParseInt(",
+              " \t\tport, 10, 32,",
+              " \t); err != nil || portNum > 65535 || portNum < 1 {",
+              " \t\treturn false",
+              " \t}",
+              " \t// If host is specified, it should match a DNS name",
+              " \tif host != \"\" {",
+              "-\t\treturn hostnameRegexRFC1123().MatchString(host)",
+              "+\t\treturn isHostnameRFC1123String(host)",
+              " \t}",
+              " \treturn true",
+              " }",
+              " // IsPort validates if the current field's value represents a valid port",
+              " func isPort(fl FieldLevel) bool {",
+              " \tval := fl.Field().Uint()",
+              " \treturn val >= 1 && val <= 65535",
+              " }"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "validator_test.go",
+        "hunks": [
+          {
+            "header": "",
+            "lines": [
+              "--- a/validator_test.go",
+              "+++ b/validator_test.go"
+            ]
+          },
+          {
+            "header": "@@ -10994,20 +10994,25 @@ func TestHostnameRFC1123Validation(t *testing.T) {",
+            "lines": [
+              " \t\t{\"example\", true},",
+              " \t\t{\"1.foo.com\", true},",
+              " \t\t{\"test.example.com.\", false},",
+              " \t\t{\"example.com.\", false},",
+              " \t\t{\"example24.com.\", false},",
+              " \t\t{\"test.example24.com.\", false},",
+              " \t\t{\"test24.example24.com.\", false},",
+              " \t\t{\"example.\", false},",
+              " \t\t{\"test_example\", false},",
+              " \t\t{\"192.168.0.1\", true},",
+              "+\t\t{\"1.2.3.4\", true},",
+              "+\t\t{\"277.168.0.1\", false},",
+              "+\t\t{\"256.1.1.1\", false},",
+              "+\t\t{\"123.456.789.0\", false},",
+              "+\t\t{\"01.2.3.4\", false},",
+              " \t\t{\"email@example.com\", false},",
+              " \t\t{\"2001:cdba:0000:0000:0000:0000:3257:9652\", false},",
+              " \t\t{\"2001:cdba:0:0:0:0:3257:9652\", false},",
+              " \t\t{\"2001:cdba::3257:9652\", false},",
+              " \t\t{\"\", false},",
+              " \t\t{\"-example.com\", false},",
+              " \t\t{\"example-.com\", false},",
+              " \t\t{\"foo.-bar.com\", false},",
+              " \t\t{\"foo.bar-.com\", false},",
+              " \t\t{\"example..com\", false},"
+            ]
+          },
+          {
+            "header": "@@ -11054,20 +11059,25 @@ func TestHostnameRFC1123AliasValidation(t *testing.T) {",
+            "lines": [
+              " \t\t{\"example\", true},",
+              " \t\t{\"1.foo.com\", true},",
+              " \t\t{\"test.example.com.\", false},",
+              " \t\t{\"example.com.\", false},",
+              " \t\t{\"example24.com.\", false},",
+              " \t\t{\"test.example24.com.\", false},",
+              " \t\t{\"test24.example24.com.\", false},",
+              " \t\t{\"example.\", false},",
+              " \t\t{\"test_example\", false},",
+              " \t\t{\"192.168.0.1\", true},",
+              "+\t\t{\"1.2.3.4\", true},",
+              "+\t\t{\"277.168.0.1\", false},",
+              "+\t\t{\"256.1.1.1\", false},",
+              "+\t\t{\"123.456.789.0\", false},",
+              "+\t\t{\"01.2.3.4\", false},",
+              " \t\t{\"email@example.com\", false},",
+              " \t\t{\"2001:cdba:0000:0000:0000:0000:3257:9652\", false},",
+              " \t\t{\"2001:cdba:0:0:0:0:3257:9652\", false},",
+              " \t\t{\"2001:cdba::3257:9652\", false},",
+              " \t}",
+              " \tvalidate := New()",
+              " \tvalidate.RegisterAlias(\"hostname\", \"hostname_rfc1123\")",
+              " \tfor i, test := range tests {"
+            ]
+          },
+          {
+            "header": "@@ -13513,20 +13523,21 @@ func Test_hostnameport_validator(t *testing.T) {",
+            "lines": [
+              " \ttype testInput struct {",
+              " \t\tdata     string",
+              " \t\texpected bool",
+              " \t}",
+              " \ttestData := []testInput{",
+              " \t\t{\"bad..domain.name:234\", false},",
+              " \t\t{\"extra.dot.com.\", false},",
+              " \t\t{\"localhost:1234\", true},",
+              " \t\t{\"192.168.1.1:1234\", true},",
+              "+\t\t{\"277.168.0.1:8080\", false},",
+              " \t\t{\":1234\", true},",
+              " \t\t{\"domain.com:1334\", true},",
+              " \t\t{\"this.domain.com:234\", true},",
+              " \t\t{\"domain:75000\", false},",
+              " \t\t{\"missing.port\", false},",
+              " \t}",
+              " \tfor _, td := range testData {",
+              " \t\th := Host{Addr: td.data}",
+              " \t\tv := New()",
+              " \t\terr := v.Struct(h)"
+            ]
+          }
+        ]
+      }
+    ],
+    "patch_stats": {
+      "file_count": 2,
+      "additions": 42,
+      "deletions": 2,
+      "has_tests": true
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "url": "https://github.com/go-playground/validator/issues/1561",
+  "owner": "go-playground",
+  "repo": "validator",
+  "number": 1561,
+  "title": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check",
+  "body": "### What happened?\n\nAccording to rfc1123: \"a valid host name can never have the dotted-decimal form #.#.#.#, since at least the highest-level component label will be alphabetic.\"\nHowever, for example, 277.168.0.1 is returned as a valid host, which is not a valid IPv4 address because of the first octet and should not be a valid hostname based on the rfc quoted above.\n\n### Version\n\nv10\n\n### Example Code\n\n```go\nfunc TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL\n```",
+  "labels": [
+    "bug"
+  ],
+  "state": "open",
+  "comments": [],
+  "full_text": "[Bug]: hostname_rfc1123 validation does not enforce IPv4 octet check\n### What happened?\n\nAccording to rfc1123: \"a valid host name can never have the dotted-decimal form #.#.#.#, since at least the highest-level component label will be alphabetic.\"\nHowever, for example, 277.168.0.1 is returned as a valid host, which is not a valid IPv4 address because of the first octet and should not be a valid hostname based on the rfc quoted above.\n\n### Version\n\nv10\n\n### Example Code\n\n```go\nfunc TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL\n```",
+  "anchors": {
+    "identifiers": [
+      "Bug",
+      "IPv4",
+      "What",
+      "According",
+      "However",
+      "Version",
+      "Example",
+      "Code",
+      "TestHostnameRFC1123Validation",
+      "FAIL",
+      "Hostname"
+    ],
+    "backtick_terms": [],
+    "error_strings": [],
+    "paths": [
+      "validator-master/validator_test.go"
+    ],
+    "linked_issues": [],
+    "stack_frames": []
+  },
+  "code_snippets": [
+    "func TestHostnameRFC1123Validation(t *testing.T) {\n\ttests := []struct {\n\t\tparam    string\n\t\texpected bool\n\t}{\n\t\t{\"277.168.0.1\", false},\n         }\n....\n}\n\n--- FAIL: TestHostnameRFC1123Validation (0.00s)\nvalidator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>\nFAIL\nFAIL\tgithub.com/go-playground/validator/v10\t0.011s\nFAIL"
+  ],
+  "search_terms": [
+    "Bug",
+    "IPv4",
+    "What",
+    "According",
+    "However",
+    "Version",
+    "Example",
+    "Code",
+    "TestHostnameRFC1123Validation",
+    "FAIL",
+    "Hostname",
+    "validator-master/validator_test.go"
+  ],
+  "identifiers": [
+    "Bug",
+    "IPv4",
+    "What",
+    "According",
+    "However",
+    "Version",
+    "Example",
+    "Code",
+    "TestHostnameRFC1123Validation",
+    "FAIL",
+    "Hostname"
+  ],
+  "error_strings": [],
+  "backtick_terms": []
+}

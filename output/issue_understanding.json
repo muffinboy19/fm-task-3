@@ -1,0 +1,41 @@
+{
+  "symptom": "277.168.0.1 is returned as a valid host by hostname_rfc1123 validation even though the first octet is invalid and RFC1123 says a valid host name can never have the dotted-decimal form #.#.#.#.",
+  "expected": "According to RFC1123, dotted-decimal form hostnames should not be valid; 277.168.0.1 should not validate as a hostname because it is not a valid IPv4 address (first octet out of range) and should fail hostname_rfc1123 validation.",
+  "actual": "277.168.0.1 is accepted as a valid host; TestHostnameRFC1123Validation expects false but validation passes with Error: <nil>.",
+  "repro": "Run TestHostnameRFC1123Validation with param \"277.168.0.1\" and expected false using go-playground/validator v10; test fails at validator-master/validator_test.go:10679.",
+  "anchors": {
+    "identifiers": [
+      "Bug",
+      "IPv4",
+      "What",
+      "According",
+      "However",
+      "Version",
+      "Example",
+      "Code",
+      "TestHostnameRFC1123Validation",
+      "FAIL",
+      "Hostname",
+      "hostname_rfc1123",
+      "rfc1123",
+      "v10"
+    ],
+    "paths": [
+      "validator-master/validator_test.go",
+      "github.com/go-playground/validator/v10"
+    ],
+    "error_strings": [
+      "--- FAIL: TestHostnameRFC1123Validation (0.00s)",
+      "validator-master/validator_test.go:10679: Hostname: {277.168.0.1 false} failed Error: <nil>",
+      "FAIL",
+      "FAIL\tgithub.com/go-playground/validator/v10\t0.011s"
+    ],
+    "linked_issues": [],
+    "backtick_terms": [],
+    "stack_frames": []
+  },
+  "type": "bug",
+  "open_questions": [],
+  "confidence": "high",
+  "source": "llm"
+}

@@ -1,0 +1,2 @@
+2026-06-04 15:08:44,315 | INFO     | Running tests for packages: ['./render']
+2026-06-04 15:08:44,315 | INFO     |   go test ./render

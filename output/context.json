@@ -1,0 +1,35 @@
+{
+  "anchor_paths_used": [
+    "validator-master/validator_test.go"
+  ],
+  "grep_terms_used": [
+    "--- FAIL: TestHostnameRFC1123Validation (0.00s)",
+    "v10",
+    "FAIL",
+    "However",
+    "rfc1123",
+    "Hostname",
+    "According",
+    "hostname_rfc1123",
+    "TestHostnameRFC1123Validation",
+    "FAIL\tgithub.com/go-playground/validator/v10\t0.011s"
+  ],
+  "candidate_files": [
+    "baked_in.go",
+    "translations/id/id.go",
+    "doc.go",
+    "non-standard/validators/notblank.go",
+    "_examples/gin-upgrading-overriding/v8_to_v9.go",
+    "validator_test.go"
+  ],
+  "candidate_function_names": [
+    "TestHostnameRFC1123Validation",
+    "TestHostnameRFC1123AliasValidation",
+    "isHostnameRFC1123",
+    "isHostnameRFC952",
+    "isHostnamePort",
+    "TestHostnameRFC952Validation"
+  ],
+  "convention_snapshot": "- Error wrapping: uses fmt.Errorf with %w verb\n- Receivers: short single-letter names\n- Error returns: (result, error) tuple pattern",
+  "conventions_file": "/Users/gaurav/Desktop/pocketfmTask/output/conventions.md"
+}

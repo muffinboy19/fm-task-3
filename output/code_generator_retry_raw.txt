@@ -1,0 +1,84 @@
+```diff
+diff --git a/baked_in.go b/baked_in.go
+--- a/baked_in.go
++++ b/baked_in.go
+@@ -2707,9 +2707,34 @@
+ func isHostnameRFC952(fl FieldLevel) bool {
+ 	return hostnameRegexRFC952().MatchString(fl.Field().String())
+ }
++
++func isHostnameRFC1123String(s string) bool {
++	if !hostnameRegexRFC1123().MatchString(s) {
++		return false
++	}
++
++	parts := strings.Split(s, ".")
++	if len(parts) != 4 {
++		return true
++	}
++
++	for _, part := range parts {
++		if part == "" {
++			return true
++		}
++		for i := 0; i < len(part); i++ {
++			if part[i] < '0' || part[i] > '9' {
++				return true
++			}
++		}
++	}
++
++	ip := net.ParseIP(s)
++	return ip != nil && ip.To4() != nil
++}
++
+ func isHostnameRFC1123(fl FieldLevel) bool {
+-	return hostnameRegexRFC1123().MatchString(fl.Field().String())
++	return isHostnameRFC1123String(fl.Field().String())
+ }
+ 
+ func isFQDN(fl FieldLevel) bool {
+@@ -2836,7 +2861,7 @@
+ 
+ 	// If host is specified, it should match a DNS name
+ 	if host != "" {
+-		return hostnameRegexRFC1123().MatchString(host)
++		return isHostnameRFC1123String(host)
+ 	}
+ 	return true
+ }
+diff --git a/validator_test.go b/validator_test.go
+--- a/validator_test.go
++++ b/validator_test.go
+@@ -10508,6 +10508,11 @@
+ 		{"example.", false},
+ 		{"test_example", false},
+ 		{"192.168.0.1", true},
++		{"277.168.0.1", false},
++		{"256.0.0.1", false},
++		{"123.456.789.0", false},
++		{"999.999.999.999", false},
++		{"0.0.0.0", true},
+ 		{"email@example.com", false},
+ 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
+ 		{"2001:cdba:0:0:0:0:3257:9652", false},
+@@ -10556,6 +10561,9 @@
+ 		{"example.", false},
+ 		{"test_example", false},
+ 		{"192.168.0.1", true},
++		{"277.168.0.1", false},
++		{"256.0.0.1", false},
++		{"123.456.789.0", false},
+ 		{"email@example.com", false},
+ 		{"2001:cdba:0000:0000:0000:0000:3257:9652", false},
+ 		{"2001:cdba:0:0:0:0:3257:9652", false},
+@@ -12906,6 +12914,7 @@
+ 		{"extra.dot.com.", false},
+ 		{"localhost:1234", true},
+ 		{"192.168.1.1:1234", true},
++		{"277.168.0.1:8080", false},
+ 		{":1234", true},
+ 		{"domain.com:1334", true},
+ 		{"this.domain.com:234", true},
+
+```
