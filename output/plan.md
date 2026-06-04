@@ -1,85 +1,76 @@
 ## Root cause
 
-`go-playground/validator` only compiles and executes `validate` tags at runtime (`extractStructCache` / `parseFieldTagsRecursive` in `cache.go`). There is no API that introspects those tags and emits JSON Schema. Issue [#1518](https://github.com/go-playground/validator/issues/1518) asks for schema generation for config files; a maintainer noted this is currently handled externally (e.g. [invopop/jsonschema](https://github.com/invopop/jsonschema)), which reads `json` tags—not `validate` tags—so it does not reflect validator constraints today.
+The library validates values at runtime via `validate` struct tags (parsed in `extractStructCache` / `parseFieldTagsRecursive` in `cache.go`) but has no code path that emits JSON Schema. Issue [#1518](https://github.com/go-playground/validator/issues/1518) asks for the inverse: static schema generation for config/documentation. A maintainer already noted this likely should not live in core and pointed to [invopop/jsonschema](https://github.com/invopop/jsonschema), which generates schema from `json` / `jsonschema` tags—not from `validate` tags—so today users must duplicate constraints or hand-bridge tags themselves.
 
 ## Proposed fix
 
-Add an **opt-in JSON Schema generator in the root `validator` package** (not core validation path) that reuses the existing tag cache and alias resolution:
+**Recommended (minimal, aligned with maintainer feedback):** Do not add schema generation to the main `validator` package. Add a small **optional** module `jsonschema/` (own `go.mod`, same pattern as `_examples/validate_fn`) that wraps `invopop/jsonschema` and maps a **bounded subset** of `validate` tags onto JSON Schema keywords via `Reflector.InterceptProp`. Expose one entry point:
 
-1. **Public entry point** on `*Validate`:
-   - `JSONSchema(i any) ([]byte, error)` — accepts a struct instance or pointer (same shape as `Struct`).
-   - Optional companion: `JSONSchemaFromType(reflect.Type) (map[string]any, error)` for tooling that only has a type.
+- `Reflect(cfg any, opts ...Option) (*jsonschema.Schema, error)` — uses `json` tag names for properties; optional `Option` to mirror `RegisterTagNameFunc` (e.g. custom name from `schema` tag, same idea as `TestCustomFieldName`).
 
-2. **Internal generator** (new unexported helper, e.g. `generateJSONSchema(v *Validate, typ reflect.Type) map[string]any`):
-   - Bootstrap struct metadata via existing `extractStructCache(reflect.Zero(typ), typ.Name())` so aliases, custom tag name func, and `rules` overrides are honored.
-   - Walk `cField` / `cTag` chains already parsed for validation.
-   - Build JSON Schema Draft 2020-12 (`$schema`, `type`, `properties`, `required`, `items`, etc.) as `map[string]any`, then `json.Marshal` in `JSONSchema`.
+**Phase 1 tag mapping** (everything else ignored silently or documented as unsupported):
 
-3. **Field naming** (config-file oriented):
-   - Property key from `json` tag (strip `,omitempty`), skip `json:"-"`.
-   - If `RegisterTagNameFunc` is set, use it (same precedence as validation namespaces).
-   - Fall back to struct field name.
+| `validate` | JSON Schema |
+|------------|-------------|
+| `required` | add to parent `required` |
+| `-` | omit property |
+| `min` / `max` | `minimum`/`maximum` or `minLength`/`maxLength` by Go kind |
+| `len=N` | `minLength` & `maxLength` = N |
+| `eq=val` | `const` |
+| `oneof=a b c` | `enum` |
+| `email`, `url`, `uri`, `http_url`, `https_url` | `format` |
+| `uuid`, `uuid4`, … | `pattern` (reuse regex intent from `baked_in.go` where practical) |
+| `numeric`, `number`, `boolean` | tighten `type` |
+| `dive,...` | `items` sub-schema from remainder of tag chain |
+| nested struct / pointer to struct | `$ref` or inline `properties` via reflect walk |
 
-4. **Type mapping** from `reflect.Type` / `Kind`:
-   - `string` → `"string"`; numeric kinds → `"integer"` or `"number"`; `bool` → `"boolean"`.
-   - `slice`/`array` → `"array"` + `"items"` (follow `dive` into element schema).
-   - `map` → `"object"` (values from `dive`; keys as `"additionalProperties"` unless `keys`/`endkeys` present—see assumptions).
-   - nested struct → nested `"object"` with `"properties"`.
-   - `time.Time` → `"string"` with `"format": "date-time"`.
+**Out of scope for v1:** cross-field tags (`eqfield`, `gtfield`, …), conditional tags (`required_if`, `excluded_*`, …), `structonly`/`keys`/`endkeys` map-key rules, and custom `RegisterValidation` tags (no stable schema semantics).
 
-5. **Constraint mapping** (first pass—common config tags only):
+**Docs:** Short README section + `_examples/jsonschema/main.go` showing `Reflect` → `json.MarshalIndent` to a config schema file.
 
-   | `validate` tag | JSON Schema keyword |
-   |---|---|
-   | `required` | field in parent `"required"` |
-   | `min` / `max` | `minimum`/`maximum` (numbers) or `minLength`/`maxLength` (string/array) |
-   | `len=n` | `minLength`/`maxLength` = n |
-   | `gt`/`gte`/`lt`/`lte` | `exclusiveMinimum`/`minimum`/`exclusiveMaximum`/`maximum` |
-   | `oneof` | `enum` |
-   | `email`, `url`, `uri`, `uuid`, `ipv4`, `ipv6` | `format` |
-   | `regexp`/`contains`/`startswith`/… | `pattern` where a stable regex exists in `regexes.go` |
-   | `-`, `structonly`, `omitempty`, `omitzero`, `omitnil` | omit from `"required"` / no extra keywords |
-   | cross-field (`eqfield`, `required_with`, …) | **skip** (not expressible in per-field schema) |
-
-6. **Documentation only in README**: short “JSON Schema generation” section with example and explicit limitations (cross-field rules, custom validators). No change to validation behavior.
-
-**Scope guard:** Do not add `invopop/jsonschema` as a dependency; emit plain `encoding/json`-friendly maps to keep the module lean and aligned with maintainer feedback.
+**Not proposed:** Exporting internal `cStruct`/`cTag` cache, or mapping all ~100+ baked-in validators in the first PR.
 
 ## Files to change
 
 | File | Change |
-|---|---|
-| `jsonschema.go` | New: `JSONSchema`, `JSONSchemaFromType`, schema builder walking `cStruct`/`cField`/`cTag`, tag→keyword mapping, property/required assembly |
-| `jsonschema_test.go` | New: table-driven tests (see below) |
-| `README.md` | New subsection under Usage: feature, example, supported tags, limitations |
+|------|--------|
+| `jsonschema/go.mod` | New module; `require github.com/invopop/jsonschema` and `github.com/go-playground/validator/v10` |
+| `jsonschema/reflect.go` | `Reflect`, options (`WithTagNameFunc`, `WithValidateTagName`), struct walk + `InterceptProp` hook |
+| `jsonschema/mapping.go` | `applyValidateTag(chain, prop *jsonschema.Schema, parent *jsonschema.Schema, name string)` for Phase 1 table |
+| `jsonschema/reflect_test.go` | All new tests (package `jsonschema_test` or `jsonschema` per sibling style in `non-standard/validators`) |
+| `_examples/jsonschema/main.go` | Runnable example writing schema JSON |
+| `README.md` | “JSON Schema generation” subsection linking to `jsonschema/` module and example |
+| `doc.go` | One paragraph cross-link (no API in root `validator` package) |
 
-**No changes** to `cache.go`, `validator.go`, `baked_in.go`, or validation hot paths unless a tiny exported helper is needed (prefer reusing existing unexported cache from the same package).
+**No changes** to `cache.go`, `validator_instance.go`, `baked_in.go`, or `validator_test.go` unless a later PR adds exported introspection (not needed for v1).
 
 ## Test strategy
 
-Add `jsonschema_test.go` in package `validator`, using dot-imported `github.com/go-playground/assert/v2` and `t.Run` subtests like sibling tests.
+Add `jsonschema/reflect_test.go` using `github.com/go-playground/assert/v2` and table-driven `t.Run` (match `non-standard/validators/notblank_test.go` style). Assert via `json.Marshal` + `json.Unmarshal` into `map[string]any` and check keys (same round-trip style used elsewhere in the repo).
 
 | Test | Cases | Expected |
-|---|---|---|
-| `TestJSONSchema_simpleConfig` | Struct with `Name string \`json:"name" validate:"required,min=1,max=64"\``, `Port int \`json:"port" validate:"required,gte=1,lte=65535"\``, `Debug bool \`json:"debug"\`` | Unmarshal output; `type=object`; `properties.name` has `type=string`, `minLength=1`, `maxLength=64`; `properties.port` has `minimum=1`, `maximum=65535`; `required` contains `"name"`, `"port"`; `"debug"` not required |
-| `TestJSONSchema_omitemptyNotRequired` | `Opt string \`json:"opt" validate:"omitempty,min=1"\`` | Field absent from `required`; still has `minLength=1` when present |
-| `TestJSONSchema_skipDashTag` | `Skip string \`json:"skip" validate:"-"\`` | Property omitted entirely |
-| `TestJSONSchema_jsonDashOmitted` | `Hidden string \`json:"-" validate:"required"\`` | Property omitted |
-| `TestJSONSchema_oneofEnum` | `Mode string \`json:"mode" validate:"oneof=dev prod"\`` | `properties.mode.enum` == `["dev","prod"]` |
-| `TestJSONSchema_nestedStruct` | Parent with nested struct field `validate:"required"` | Child schema under `properties.<field>.properties`; child required fields propagated |
-| `TestJSONSchema_diveSlice` | `Tags []string \`json:"tags" validate:"dive,min=1"\`` | `type=array`, `items.type=string`, `items.minLength=1` |
-| `TestJSONSchema_registerTagNameFunc` | Same as `TestCustomFieldName` pattern using `schema` tag + `RegisterTagNameFunc` | Property keys use custom names (`b`, `c`), not Go field names |
-| `TestJSONSchema_nonStructInput` | Pass `validate.Var("x", "required")` input (string) | Returns error (mirrors `Struct` misuse semantics) |
-| `TestJSONSchema_roundTripMarshal` | Any valid schema from above | `json.Unmarshal` into `map[string]any` succeeds; top-level `$schema` present |
+|------|-------|----------|
+| `TestReflect_required` | `struct { Name string \`json:"name" validate:"required"\` }` | `properties.name` present; root `required` contains `"name"` |
+| `TestReflect_minMax_string` | `Bio string \`validate:"min=2,max=10"\`` | `minLength: 2`, `maxLength: 10` |
+| `TestReflect_len` | `Code string \`validate:"len=4"\`` | `minLength` and `maxLength` both 4 |
+| `TestReflect_oneof` | `Role string \`validate:"oneof=admin user"\`` | `enum`: `["admin","user"]` |
+| `TestReflect_email` | `Email string \`validate:"email"\`` | `format`: `"email"` |
+| `TestReflect_nested` | nested struct with inner `validate:"required"` | inner object in `properties`; inner field in nested `required` |
+| `TestReflect_dive` | `Tags []string \`validate:"dive,required"\`` | `type: array`, `items.required` or equivalent item constraints |
+| `TestReflect_skip` | `Secret string \`validate:"-"\`` | property absent from `properties` |
+| `TestReflect_customTagName` | `RegisterTagNameFunc` / `WithTagNameFunc` using `schema:"b"` | property key `"b"`, not `"B"` |
+| `TestReflect_unsupportedTag` | `validate:"eqfield=Other"` | schema emitted without `const`/cross-field noise; no panic |
+| `TestReflect_marshalRoundTrip` | simple config struct | `Reflect` → marshal → unmarshal succeeds; stable `type: object` at root |
 
-**Before fix:** all new tests fail (symbols/method missing). **After fix:** `go test -run TestJSONSchema ./...` passes.
+**Failing-before / passing-after:** Run `go test ./jsonschema/...` on current `master` — module absent, so tests do not exist (N/A). After implementation, tests fail if mapping is wrong, pass when Phase 1 table is implemented.
+
+**Regression:** `go test ./...` at repo root must remain green (core module unchanged).
 
 ## Risks / assumptions
 
-- **Maintainer scope:** Core team may prefer closing as “use invopop/jsonschema.” This plan treats the issue as “schema from `validate` tags,” which external tools do not provide; implementation stays isolated in new files.
-- **Partial tag coverage:** Only commonly mappable baked-in tags in v1; cross-field, conditional (`required_if`, `required_with`), struct-level validators, and user-registered validators are documented as unsupported (no panic, no false constraints).
-- **JSON Schema draft:** Assume Draft 2020-12 (`$schema: https://json-schema.org/draft/2020-12/schema`); document if a different draft is chosen.
-- **Map `keys`/`endkeys`:** v1 assumes string-keyed maps with `dive` on values only; keyed map validation rules are out of scope unless explicitly added later.
-- **Pointer fields:** Treat non-nil struct pointers as nested objects; pointer optionality vs `required` follows `validate` tags on the pointer field, not Go nilability alone.
-- **Performance:** Acceptable for offline config schema export; no caching beyond existing `structCache` reuse.
-- **API stability:** New exported methods only; no breaking changes to v10 validation API.
+- **Assumption:** Acceptable deliverable is an **optional** `jsonschema/` module + docs, not a new method on `validator.Validate`, per [maintainer comment](https://github.com/go-playground/validator/issues/1518#issuecomment-3741124446).
+- **Assumption:** Users want property names from **`json` tags** (default); `validate` tags only drive constraints, matching how configs are serialized.
+- **Risk:** JSON Schema cannot express many validator rules (conditional required, cross-field, filesystem `file`/`dir`, custom validators)—generated schema may be **weaker** than runtime validation; document “schema is indicative, not equivalent to `Struct()`”.
+- **Risk:** Alias expansion (`RegisterAlias`, baked-in aliases like `iscolor`) must be expanded before mapping or users get incomplete schemas; v1 should reuse the same comma-split + alias resolution rules as `parseFieldTagsRecursive` (copied minimally into `jsonschema`, not imported from unexported internals).
+- **Risk:** Adding `invopop/jsonschema` to the **root** `go.mod` would affect all consumers; keep it in a **separate** `jsonschema/go.mod` unless maintainers explicitly want a first-class subpackage in the main module.
+- **Alternative rejected for minimal scope:** Full in-core `(*Validate).JSONSchema()` with complete baked-in tag coverage—too large, duplicates invopop, conflicts with maintainer guidance.

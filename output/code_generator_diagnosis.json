@@ -1,13 +1,13 @@
 {
   "patch_lines": 14,
-  "patch_chars": 641,
+  "patch_chars": 937,
   "ends_with_newline": true,
   "diff_file_count": 1,
-  "hunk_count": 1,
+  "hunk_count": 2,
   "issues": [
     "HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "HUNK_1_0_NEW_COUNT_MISMATCH: header says +26 lines, found 9 on new side (6 '+', 3 ' ')",
-    "SECTION_1_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +)",
+    "HUNK_1_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
+    "HUNK_1_1_NEW_COUNT_MISMATCH: header says +11 lines, found 2 on new side (0 '+', 2 ' ')",
     "GIT_APPLY: error: corrupt patch at line 15"
   ],
   "git_apply_exit": 128,

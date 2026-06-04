@@ -361,6 +361,36 @@ def main():
                 log.step_ok("5", summary_text or "Patch matches plan")
             else:
                 log.step_warn("5", summary_text[:200])
+                deviations = (vr.get("deviations") or [])[:8]
+                if deviations:
+                    log.info("Regenerating patch to align with plan...")
+                    try:
+                        regen = generator.regenerate(
+                            issue,
+                            context,
+                            plan,
+                            patch,
+                            "Plan validation failed. Fix ALL of the following:\n"
+                            + "\n".join(f"- {d}" for d in deviations)
+                            + f"\n\nSummary: {summary_text}",
+                        )
+                        patch_path.write_text(regen, encoding="utf-8")
+                        patch = regen
+                        log.diff_summary(patch, str(patch_path))
+                        result = Validator(api_key=api_key).validate(
+                            plan=plan, patch=patch
+                        )
+                        vr = result.get("validation_report") or {}
+                        plan_aligned = bool(result.get("plan_aligned"))
+                        if result["passed"]:
+                            log.step_ok("5", "Aligned after regeneration")
+                        else:
+                            log.step_warn(
+                                "5",
+                                (vr.get("summary") or "still not aligned")[:200],
+                            )
+                    except Exception as regen_err:
+                        log.warning(f"Plan-alignment regeneration failed: {regen_err}")
         except Exception as e:
             plan_aligned = False
             log.step_fail("5", str(e))

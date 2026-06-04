@@ -1,14 +1,14 @@
 diff --git a/README.md b/README.md
-index 8462d21..63234d1 100644
+index 8462d21..0dc8122 100644
 --- a/README.md
 +++ b/README.md
-@@ -69,6 +69,25 @@ Please see https://pkg.go.dev/github.com/go-playground/validator/v10 for detaile
+@@ -68,6 +68,7 @@ Please see https://pkg.go.dev/github.com/go-playground/validator/v10 for detaile
+ - [Translations & Custom Errors](https://github.com/go-playground/validator/blob/master/_examples/translations/main.go)
  - [Gin upgrade and/or override validator](https://github.com/go-playground/validator/tree/v9/_examples/gin-upgrading-overriding)
  - [wash - an example application putting it all together](https://github.com/bluesuncorp/wash)
++- [JSON Schema generation](https://github.com/go-playground/validator/blob/master/_examples/jsonschema/main.go)
 
-+JSON Schema generation
-+------
-+
-+You can generate a [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/schema) document from `validate` struct tags for offline config validation or documentation:
-+
-+
+ Baked-in Validations
+ ------
+@@ -356,6 +357,11 @@ BenchmarkOneof-16                                                       22503973
+ BenchmarkOneofParallel-16                                                8538474               140.4 ns/op             0 B/op          0 allocs/op

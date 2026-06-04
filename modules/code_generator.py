@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from modules.llm import LLMClient, load_prompt, extract_fence
+from modules.llm import LLMClient, load_prompt, extract_unified_diff
 from modules.patch_utils import analyze_patch
 from modules.agent_logger import get_logger
 from modules.repo_resolver import default_output_dir, effective_repo_path
@@ -83,7 +83,7 @@ Output ONLY the corrected unified diff.
         raw_path.write_text(raw, encoding="utf-8")
         log.info(f"Raw LLM response saved ({len(raw)} chars) → {raw_path}")
 
-        patch = self._normalize_patch(extract_fence(raw, "diff"))
+        patch = self._normalize_patch(extract_unified_diff(raw))
         diag = analyze_patch(patch, self.repo_path)
 
         log.info(f"Patch stats: {diag['patch_lines']} lines, {diag['patch_chars']} chars")

@@ -43,9 +43,45 @@ def load_prompt(name: str) -> str:
         return f.read()
 
 
+def extract_unified_diff(text: str) -> str:
+    """
+    Extract a unified diff from an LLM response.
+
+    Models often close ```diff early; prefer the longest valid diff segment.
+    """
+    text = text.strip()
+    total_diff_files = len(re.findall(r"^diff --git ", text, re.MULTILINE))
+    blocks = re.findall(r"```diff\s*\n(.*?)```", text, re.DOTALL)
+    diff_blocks = [b.strip() for b in blocks if "diff --git" in b]
+    if diff_blocks:
+        best = max(diff_blocks, key=lambda b: (b.count("diff --git"), len(b)))
+        # Model closed ``` early but continued the patch outside the fence
+        if best.count("diff --git") >= total_diff_files and total_diff_files >= 1:
+            return _normalize_diff_text(best)
+
+    # Fence closed early: take everything from first diff --git
+    m = re.search(r"^diff --git ", text, re.MULTILINE)
+    if m:
+        chunk = text[m.start() :]
+        chunk = re.sub(r"\n```\s*$", "", chunk.strip())
+        return _normalize_diff_text(chunk)
+
+    # Last resort: strip optional outer fence markers
+    stripped = re.sub(r"^```(?:diff)?\s*\n", "", text)
+    stripped = re.sub(r"\n```\s*$", "", stripped.strip())
+    return _normalize_diff_text(stripped)
+
+
+def _normalize_diff_text(patch: str) -> str:
+    lines = [line.rstrip() for line in patch.splitlines()]
+    return "\n".join(lines) + "\n" if lines else ""
+
+
 def extract_fence(text: str, lang: str = "") -> str:
-    # Prefer the largest ```diff block (avoid grabbing a tiny partial fence)
     if lang == "diff":
+        return extract_unified_diff(text)
+    # Prefer the largest fenced block for other languages
+    if lang == "diff_legacy":
         blocks = re.findall(r"```diff\s*\n(.*?)```", text, re.DOTALL)
         if blocks:
             return max(blocks, key=len).strip()

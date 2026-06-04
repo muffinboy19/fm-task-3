@@ -17,8 +17,12 @@ _STOP_WORDS = frozenset({
     "Test", "Results", "Original", "Rendered", "Decoded", "Round", "Output",
     "Non", "Character", "Corruption", "Issue", "Confirmed", "Scenario", "Result",
     "Working", "Corrupted", "PR", "Thanks", "Feel", "Per", "UTF", "BMP", "ASCII",
-    "Unicode", "FFFF", "RFC", "CJK", "Offending",     "Write", "WriteByte", "Appendf", "Unmarshal", "MaxASCII", "BytesToString",
-    "NewRecorder", "Data", "Body", "Println", "Printf",
+    "Unicode", "FFFF", "RFC", "CJK", "Offending", "Write", "WriteByte", "Appendf",
+    "Unmarshal", "MaxASCII", "BytesToString", "NewRecorder", "Data", "Body",
+    "Println", "Printf",
+    # Issue prose / labels (not code symbols)
+    "That", "Personally", "You", "There", "Schema", "Feature", "Generate",
+    "README", "Would", "Could", "Should", "From", "With", "What", "How",
 })
 
 _TITLE_SYMBOL_RE = re.compile(r"\b([A-Z][a-zA-Z0-9]*(?:\.[A-Z][a-zA-Z0-9]*)+)\b")
@@ -76,6 +80,41 @@ def curated_grep_terms(issue: dict, max_terms: int = 10) -> list[str]:
         if len(out) >= max_terms:
             break
     return out[:max_terms]
+
+
+def fallback_grep_terms(issue: dict, max_terms: int = 8) -> list[str]:
+    """Domain terms from title/body when curated identifiers miss the repo."""
+    title = issue.get("title") or ""
+    body = issue.get("body") or ""
+    blob = f"{title}\n{body}"
+    candidates: list[str] = []
+
+    if re.search(r"json\s*schema", blob, re.I):
+        candidates.extend(["jsonschema", "JSONSchema", "Reflect"])
+    if re.search(r"struct\s+tags?", blob, re.I):
+        candidates.extend(["validate", "parseFieldTags", "extractStructCache"])
+    if re.search(r"invopop", blob, re.I):
+        candidates.append("invopop")
+
+    for term in re.findall(r"`([^`]{3,60})`", blob):
+        if _is_grep_worthy(term):
+            candidates.append(term.strip())
+
+    for m in _TITLE_SYMBOL_RE.finditer(title):
+        sym = m.group(1)
+        if _is_grep_worthy(sym):
+            candidates.append(sym)
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for t in candidates:
+        key = t.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(t)
+        if len(out) >= max_terms:
+            break
+    return out
 
 
 def curated_error_strings(issue: dict) -> list[str]:

@@ -19,6 +19,7 @@ from modules.context_search import (
     anchor_paths,
     curated_grep_terms,
     curated_error_strings,
+    fallback_grep_terms,
     resolve_paths,
 )
 
@@ -48,6 +49,15 @@ class ContextBuilder:
         log.kv("Error strings", error_strings)
 
         hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings)
+        if not hits:
+            alt_terms = fallback_grep_terms(issue)
+            if alt_terms:
+                log.warning(
+                    f"No files from primary grep; retrying with fallback terms: {alt_terms}"
+                )
+                grep_terms = list(dict.fromkeys(grep_terms + alt_terms))
+                hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings)
+
         candidate_files = [p for p, _ in hits]
 
         log.info(f"Located {len(candidate_files)} candidate file(s)")
