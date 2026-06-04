@@ -52,7 +52,7 @@ class AgentLogger:
         self._events: list[str] = []
         self._started = datetime.now()
 
-        self._py_logger = logging.getLogger("go-issue-solver")
+        self._py_logger = logging.getLogger("open-source-issue-solver")
         self._py_logger.setLevel(logging.DEBUG)
         self._py_logger.handlers.clear()
 
@@ -207,7 +207,7 @@ class AgentLogger:
     def _report_append(self, text: str):
         if not hasattr(self, "_report_buf"):
             self._report_buf = [
-                "# go-issue-solver — Run report\n",
+                "# Open Source Issue Solver — Run report\n",
                 f"**Started:** {self._started.isoformat()}\n\n",
                 "> Live dashboard: [dashboard.md](./dashboard.md)\n\n",
             ]

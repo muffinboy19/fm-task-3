@@ -124,7 +124,9 @@ def start_dashboard_server(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="go-issue-solver live dashboard")
+    parser = argparse.ArgumentParser(
+        description="Open Source Issue Solver live dashboard"
+    )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
     log_dir, output_dir = _dirs()

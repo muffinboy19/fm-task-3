@@ -1,5 +1,5 @@
 """
-go-issue-solver — agentic AI contributor for open-source Go projects.
+Open Source Issue Solver — agent for open-source Go repositories.
 """
 
 import argparse
@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 
 from modules.config import get, get_gemini_api_keys, get_cursor_api_key, get_llm_provider
@@ -19,10 +20,13 @@ from modules.validator import Validator
 from modules.pr_writer import PRWriter
 from modules.convention import format_conventions_block, load_conventions_prompt
 from modules.issue_guardrails import load_candidates, pick_next_candidate
+from modules.repo_resolver import resolve_repo_path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Agentic AI contributor for Go projects")
+    parser = argparse.ArgumentParser(
+        description="Open Source Issue Solver for Go repositories"
+    )
     parser.add_argument("--issue", default=None, help="GitHub issue URL")
     parser.add_argument("--repo", default=None, help="Local cloned Go repo path")
     parser.add_argument("--api-key", default=None)
@@ -44,9 +48,9 @@ def parse_args():
         help="Skip LLM structured intake; use rules-only understanding",
     )
     parser.add_argument(
-        "--ui",
+        "--no-ui",
         action="store_true",
-        help="Start live HTML dashboard (http://127.0.0.1:8765)",
+        help="Do not start the live HTML dashboard",
     )
     parser.add_argument(
         "--ui-port",
@@ -120,13 +124,10 @@ def main():
         return
 
     issue_url = args.issue or get("GITHUB_ISSUE_URL")
-    repo_path_str = args.repo or get("GITHUB_REPO_PATH")
+    explicit_repo = args.repo or get("GITHUB_REPO_PATH") or None
     # CLI flags override .env so LLM cwd and config stay aligned with --repo
     if args.issue:
         os.environ["GITHUB_ISSUE_URL"] = args.issue
-    if args.repo:
-        os.environ["GITHUB_REPO_PATH"] = str(Path(args.repo).resolve())
-        repo_path_str = os.environ["GITHUB_REPO_PATH"]
     output_dir = Path(args.output or get("OUTPUT_DIR", "./output")).resolve()
     log_dir = Path(args.log_dir or get("LOG_DIR", "./logs")).resolve()
     api_key = args.api_key or None
@@ -135,23 +136,25 @@ def main():
 
     log = init_logger(log_dir, output_dir=output_dir)
 
-    ui_enabled = args.ui or _env_bool("DASHBOARD_UI")
+    ui_enabled = not args.no_ui and _env_bool("DASHBOARD_UI", default=True)
     if ui_enabled:
         from modules.dashboard_server import start_dashboard_server
 
         start_dashboard_server(port=args.ui_port, log_dir=log_dir, output_dir=output_dir)
-        log.html_dashboard_url = f"http://127.0.0.1:{args.ui_port}/"
-        log.artifact("Live dashboard", log.html_dashboard_url)
+        dashboard_url = f"http://127.0.0.1:{args.ui_port}/"
+        log.html_dashboard_url = dashboard_url
+        log.artifact("Live dashboard", dashboard_url)
+        print(f"Dashboard: {dashboard_url}")
+        webbrowser.open(dashboard_url, new=2)
 
-    log.section("go-issue-solver started")
+    log.section("Open Source Issue Solver started")
     log.kv("Issue URL", issue_url)
-    log.kv("Repo path", repo_path_str)
     log.kv("Output dir", str(output_dir))
     log.kv("LLM provider", get_llm_provider())
     log.kv("Dry run", dry_run)
 
-    if not issue_url or not repo_path_str:
-        log.step_fail("1", "Missing issue URL or repo path in .env")
+    if not issue_url:
+        log.step_fail("1", "Missing issue URL (GITHUB_ISSUE_URL or --issue)")
         sys.exit(1)
 
     provider = get_llm_provider()
@@ -164,14 +167,25 @@ def main():
             log.error("Missing GEMINI_API_KEY")
             sys.exit(1)
 
-    repo_path = Path(repo_path_str).resolve()
-    if not repo_path.exists():
-        log.error(f"Repo not found: {repo_path}")
-        sys.exit(1)
+    needs_repo = not (args.stop_after and args.stop_after <= 1)
+    if needs_repo:
+        try:
+            repo_path = resolve_repo_path(issue_url, explicit=explicit_repo, log=log)
+        except Exception as e:
+            log.error(f"Failed to resolve/clone repo: {e}")
+            sys.exit(1)
+        os.environ["GITHUB_REPO_PATH"] = str(repo_path)
+        log.kv("Repo path", str(repo_path))
+    else:
+        repo_path = None
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if not args.no_reset and (not args.stop_after or args.stop_after > 1):
+    if (
+        repo_path
+        and not args.no_reset
+        and (not args.stop_after or args.stop_after > 1)
+    ):
         reset_repo(repo_path, log)
 
     # ── Step 1 ───────────────────────────────────────────────────

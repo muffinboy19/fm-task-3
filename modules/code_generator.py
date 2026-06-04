@@ -24,7 +24,7 @@ class CodeGenerator:
         self.repo_path = repo_path or self._resolve_repo()
 
     def _resolve_repo(self) -> Path:
-        repo = get("GITHUB_REPO_PATH", "./gin")
+        repo = get("GITHUB_REPO_PATH", "./test_repo")
         p = Path(repo)
         return p.resolve() if p.is_absolute() else (PROJECT_ROOT / p).resolve()
 

@@ -1,1 +1,1 @@
-# go-issue-solver agent modules
+# Open Source Issue Solver agent modules

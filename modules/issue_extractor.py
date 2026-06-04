@@ -131,7 +131,7 @@ class IssueExtractor:
         get_logger().debug(f"GitHub API GET: {url}")
         req = urllib.request.Request(url)
         req.add_header("Accept", "application/vnd.github+json")
-        req.add_header("User-Agent", "go-issue-solver/1.0")
+        req.add_header("User-Agent", "open-source-issue-solver/1.0")
         if self.token:
             req.add_header("Authorization", f"Bearer {self.token}")
         with urllib.request.urlopen(req, timeout=15) as resp:
