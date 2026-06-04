@@ -1,7 +1,7 @@
 {
-  "symptom": "Can we generate json schema from the struct tags for a complex configuration file.",
-  "expected": "Generate JSON Schema from struct tags to produce a schema file for a complex configuration file.",
-  "actual": "unknown",
+  "symptom": "Can we generate json schema from the struct tags?",
+  "expected": "Generate JSON schema from struct tags to produce a schema file for a complex configuration file.",
+  "actual": "This capability is not provided by go-playground/validator; JSON Schema can be generated from struct tags using external tools such as invopop/jsonschema.",
   "repro": "unknown",
   "anchors": {
     "identifiers": [
@@ -15,14 +15,13 @@
       "There",
       "README",
       "jsonschema",
-      "json schema",
+      "JSON Schema",
       "struct tags",
       "go-playground/validator",
       "invopop/jsonschema",
       "acrazing"
     ],
     "paths": [
-      "go-playground/validator",
       "https://github.com/invopop/jsonschema",
       "https://github.com/invopop/jsonschema?tab=readme-ov-file#example"
     ],
@@ -33,7 +32,7 @@
   },
   "type": "enhancement",
   "open_questions": [
-    "Should JSON Schema generation from struct tags be implemented in go-playground/validator or handled by an external tool such as invopop/jsonschema?"
+    "Should JSON schema generation from struct tags be implemented in go-playground/validator or handled by an external library like invopop/jsonschema?"
   ],
   "confidence": "medium",
   "source": "llm"

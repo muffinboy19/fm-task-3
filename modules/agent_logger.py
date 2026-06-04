@@ -27,7 +27,7 @@ class AgentLogger:
         ("2", "Context builder", "Path anchors + curated grep + slice"),
         ("3", "Code reasoning", "LLM fix plan"),
         ("4", "Code generator", "LLM unified diff"),
-        ("5", "Validator", "git apply + go test"),
+        ("5", "Validator", "Patch matches plan"),
         ("6", "PR writer", "LLM PR summary"),
     ]
 
@@ -109,6 +109,14 @@ class AgentLogger:
             if detail:
                 self._step_state[step_id]["detail"] = detail
         self._event(f"Step {step_id} skipped — {detail}")
+        self._refresh_ui()
+
+    def step_warn(self, step_id: str, detail: str = ""):
+        if step_id in self._step_state:
+            self._step_state[step_id]["status"] = "warn"
+            if detail:
+                self._step_state[step_id]["detail"] = detail
+        self._event(f"Step {step_id} WARN — {detail}")
         self._refresh_ui()
 
     def artifact(self, label: str, path: str):

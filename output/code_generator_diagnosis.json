@@ -1,18 +1,15 @@
 {
-  "patch_lines": 918,
-  "patch_chars": 22687,
+  "patch_lines": 14,
+  "patch_chars": 641,
   "ends_with_newline": true,
-  "diff_file_count": 6,
-  "hunk_count": 6,
+  "diff_file_count": 1,
+  "hunk_count": 1,
   "issues": [
     "HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "SECTION_2_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
-    "SECTION_3_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
-    "SECTION_4_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
-    "SECTION_5_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
-    "SECTION_6_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
-    "GIT_APPLY: error: patch failed: README.md:68\nerror: README.md: patch does not apply\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory"
+    "HUNK_1_0_NEW_COUNT_MISMATCH: header says +26 lines, found 9 on new side (6 '+', 3 ' ')",
+    "SECTION_1_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +)",
+    "GIT_APPLY: error: corrupt patch at line 15"
   ],
-  "git_apply_exit": 1,
-  "git_apply_stderr": "error: patch failed: README.md:68\nerror: README.md: patch does not apply\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory"
+  "git_apply_exit": 128,
+  "git_apply_stderr": "error: corrupt patch at line 15"
 }

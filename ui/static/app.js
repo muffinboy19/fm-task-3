@@ -276,25 +276,43 @@ function renderDiff(patchFiles, stats, raw, steps) {
 }
 
 function renderValidation(files, steps) {
+  const el = $("#tab-validation");
   const st = stepStatus(steps, "5");
   if (st === "running") {
-    $("#tab-validation").innerHTML =
-      '<p class="empty">Running validation…</p>';
+    el.innerHTML = '<p class="empty">Validating patch against plan…</p>';
     return;
   }
-  const v = files.validation;
-  const rs = files.run_summary;
-  let html = "";
-  if (rs) {
+  const check = files.plan_check || files.validation;
+  if (!check) {
+    el.innerHTML = '<p class="empty">Run step 5 to validate patch vs plan</p>';
+    return;
+  }
+  const aligned = check.aligned;
+  const badge = aligned
+    ? '<span class="badge ok">aligned</span>'
+    : '<span class="badge fail">not aligned</span>';
+  const devs = (check.deviations || [])
+    .map((d) => `<li>${esc(String(d))}</li>`)
+    .join("");
+  let html = `
+    <div class="patch-stats">${badge} · confidence: ${esc(check.confidence || "?")}</div>
+    <p>${esc(check.summary || "")}</p>
+    <h3>File comparison</h3>
+    <table class="kv-table"><tbody>
+      <tr><th>Planned</th><td><pre class="json-block">${esc((check.planned_files || []).join("\n") || "—")}</pre></td></tr>
+      <tr><th>In patch</th><td><pre class="json-block">${esc((check.patch_files || []).join("\n") || "—")}</pre></td></tr>
+      <tr><th>Missing from patch</th><td><pre class="json-block">${esc((check.missing_from_patch || []).join("\n") || "—")}</pre></td></tr>
+      <tr><th>Extra in patch</th><td><pre class="json-block">${esc((check.extra_in_patch || []).join("\n") || "—")}</pre></td></tr>
+    </tbody></table>
+    ${devs ? `<h3>Deviations</h3><ul class="events">${devs}</ul>` : ""}
+  `;
+  if (files.run_summary) {
     html += "<h3>Run summary</h3>";
-    html += `<pre class="json-block">${esc(JSON.stringify(rs, null, 2))}</pre>`;
+    html += `<pre class="json-block">${esc(JSON.stringify(files.run_summary, null, 2))}</pre>`;
   }
-  if (v) {
-    html += "<h3>Validation report</h3>";
-    html += `<pre class="json-block">${esc(JSON.stringify(v, null, 2))}</pre>`;
-  }
-  $("#tab-validation").innerHTML =
-    html || '<p class="empty">Run step 5 for validation results</p>';
+  html += "<h3>Full report</h3>";
+  html += `<pre class="json-block">${esc(JSON.stringify(check, null, 2))}</pre>`;
+  el.innerHTML = html;
 }
 
 function setupTabs() {

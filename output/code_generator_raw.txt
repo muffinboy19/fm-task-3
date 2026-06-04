@@ -1,920 +1,665 @@
 ```diff
 diff --git a/README.md b/README.md
-index 8462d21..d99437e 100644
+index 8462d21..e7f46c9 100644
 --- a/README.md
 +++ b/README.md
-@@ -68,6 +68,7 @@ Please see https://pkg.go.dev/github.com/go-playground/validator/v10 for detaile
- - [Translations & Custom Errors](https://github.com/go-playground/validator/blob/master/_examples/translations/main.go)
+@@ -69,6 +69,26 @@ Please see https://pkg.go.dev/github.com/go-playground/validator/v10 for detaile
  - [Gin upgrade and/or override validator](https://github.com/go-playground/validator/tree/v9/_examples/gin-upgrading-overriding)
  - [wash - an example application putting it all together](https://github.com/bluesuncorp/wash)
-+- [JSON Schema from validate tags](https://github.com/go-playground/validator/blob/master/_examples/jsonschema/main.go) ([`non-standard/jsonschema`](https://pkg.go.dev/github.com/go-playground/validator/v10/non-standard/jsonschema)) — opt-in schema generation for config files; for advanced rules see [invopop/jsonschema](https://github.com/invopop/jsonschema)
  
++JSON Schema generation
++------
++
++You can generate a [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/schema) document from `validate` struct tags for offline config validation or documentation:
++
++```go
++validate := validator.New()
++
++type Config struct {
++    Name string `json:"name" validate:"required,min=1,max=64"`
++    Port int    `json:"port" validate:"required,gte=1,lte=65535"`
++}
++
++schema, err := validate.JSONSchema(Config{})
++```
++
++Property names come from `json` tags (or `RegisterTagNameFunc` when set). Supported mappings include `required`, `min`/`max`/`len`, `gt`/`gte`/`lt`/`lte`, `oneof`, common string formats (`email`, `url`, `uri`, `uuid`, `ipv4`, `ipv6`), and several baked-in pattern validators.
++
++**Limitations:** cross-field rules (`eqfield`, `required_with`, …), conditional requirements, struct-level validators, and custom registered validators are not reflected in the generated schema.
++
  Baked-in Validations
  ------
-diff --git a/_examples/jsonschema/main.go b/_examples/jsonschema/main.go
+ 
+diff --git a/jsonschema.go b/jsonschema.go
 new file mode 100644
-index 0000000..113fb23
+index 0000000..19cbcdb
 --- /dev/null
-+++ b/_examples/jsonschema/main.go
-@@ -0,0 +1,28 @@
-+package main
-+
-+import (
-+	"fmt"
-+	"os"
-+
-+	"github.com/go-playground/validator/v10/non-standard/jsonschema"
-+)
-+
-+type database struct {
-+	Host string `json:"host" validate:"required,hostname|ip"`
-+	Port int    `json:"port" validate:"required,gte=1,lte=65535"`
-+}
-+
-+type config struct {
-+	Name     string   `json:"name" validate:"required"`
-+	Database database `json:"database" validate:"dive"`
-+	Tags     []string `json:"tags" validate:"dive,unique"`
-+}
-+
-+func main() {
-+	b, err := jsonschema.Generate(config{})
-+	if err != nil {
-+		fmt.Fprintf(os.Stderr, "generate schema: %v\n", err)
-+		os.Exit(1)
-+	}
-+	fmt.Println(string(b))
-+}
-diff --git a/non-standard/jsonschema/jsonschema.go b/non-standard/jsonschema/jsonschema.go
-new file mode 100644
-index 0000000..1afdae4
---- /dev/null
-+++ b/non-standard/jsonschema/jsonschema.go
-@@ -0,0 +1,110 @@
-+// Package jsonschema generates JSON Schema documents from struct validate tags.
-+package jsonschema
++++ b/jsonschema.go
+@@ -0,0 +1,389 @@
++package validator
 +
 +import (
 +	"encoding/json"
-+	"errors"
-+	"fmt"
 +	"reflect"
-+)
-+
-+const defaultDraft = "https://json-schema.org/draft/2020-12/schema"
-+
-+// Option configures schema generation.
-+type Option func(*config)
-+
-+type config struct {
-+	useJSONTag           bool
-+	tagName              string
-+	requiredStructEnable bool
-+	draft                string
-+}
-+
-+// WithJSONTag uses json struct tag names for property keys (default: enabled).
-+func WithJSONTag() Option {
-+	return func(c *config) {
-+		c.useJSONTag = true
-+	}
-+}
-+
-+// WithoutJSONTag uses Go field names for property keys.
-+func WithoutJSONTag() Option {
-+	return func(c *config) {
-+		c.useJSONTag = false
-+	}
-+}
-+
-+// WithTagName sets the struct tag name used for validation rules (default: "validate").
-+func WithTagName(name string) Option {
-+	return func(c *config) {
-+		c.tagName = name
-+	}
-+}
-+
-+// WithRequiredStructEnabled marks non-pointer struct fields with required as required in schema.
-+func WithRequiredStructEnabled() Option {
-+	return func(c *config) {
-+		c.requiredStructEnable = true
-+	}
-+}
-+
-+// WithDraft sets the root $schema URI.
-+func WithDraft(version string) Option {
-+	return func(c *config) {
-+		c.draft = version
-+	}
-+}
-+
-+func defaultConfig() *config {
-+	return &config{
-+		useJSONTag: true,
-+		tagName:    "validate",
-+		draft:      defaultDraft,
-+	}
-+}
-+
-+func applyOptions(opts ...Option) *config {
-+	cfg := defaultConfig()
-+	for _, opt := range opts {
-+		opt(cfg)
-+	}
-+	if cfg.tagName == "" {
-+		cfg.tagName = "validate"
-+	}
-+	if cfg.draft == "" {
-+		cfg.draft = defaultDraft
-+	}
-+	return cfg
-+}
-+
-+// GenerateSchema builds a JSON Schema document as a map for the given value v.
-+// v must be a struct or a pointer to struct.
-+func GenerateSchema(v any, opts ...Option) (map[string]any, error) {
-+	cfg := applyOptions(opts...)
-+	rt := reflect.TypeOf(v)
-+	if rt == nil {
-+		return nil, errors.New("jsonschema: nil input")
-+	}
-+	for rt.Kind() == reflect.Ptr {
-+		rt = rt.Elem()
-+	}
-+	if rt.Kind() != reflect.Struct {
-+		return nil, fmt.Errorf("jsonschema: expected struct, got %s", rt.Kind())
-+	}
-+	gen := &generator{cfg: cfg}
-+	schema := gen.schemaForType(rt, parseTags("", cfg.tagName))
-+	schema["$schema"] = cfg.draft
-+	if _, ok := schema["type"]; !ok {
-+		schema["type"] = "object"
-+	}
-+	return schema, nil
-+}
-+
-+// Generate returns marshaled JSON Schema for v.
-+func Generate(v any, opts ...Option) ([]byte, error) {
-+	m, err := GenerateSchema(v, opts...)
-+	if err != nil {
-+		return nil, err
-+	}
-+	return json.Marshal(m)
-+}
-diff --git a/non-standard/jsonschema/jsonschema_test.go b/non-standard/jsonschema/jsonschema_test.go
-new file mode 100644
-index 0000000..554f551
---- /dev/null
-+++ b/non-standard/jsonschema/jsonschema_test.go
-@@ -0,0 +1,202 @@
-+package jsonschema
-+
-+import (
-+	"encoding/json"
-+	"testing"
-+
-+	"github.com/go-playground/assert/v2"
-+)
-+
-+func unmarshalSchema(t *testing.T, b []byte) map[string]any {
-+	t.Helper()
-+	var m map[string]any
-+	if err := json.Unmarshal(b, &m); err != nil {
-+		t.Fatalf("unmarshal: %v", err)
-+	}
-+	return m
-+}
-+
-+func prop(m map[string]any, name string) map[string]any {
-+	props, _ := m["properties"].(map[string]any)
-+	p, _ := props[name].(map[string]any)
-+	return p
-+}
-+
-+func requiredList(m map[string]any) []string {
-+	r, _ := m["required"].([]any)
-+	out := make([]string, len(r))
-+	for i, v := range r {
-+		out[i], _ = v.(string)
-+	}
-+	return out
-+}
-+
-+func hasRequired(m map[string]any, name string) bool {
-+	for _, r := range requiredList(m) {
-+		if r == name {
-+			return true
-+		}
-+	}
-+	return false
-+}
-+
-+func TestGenerate_simpleStruct(t *testing.T) {
-+	type cfg struct {
-+		Email string `json:"email" validate:"required,email"`
-+		Port  int    `json:"port" validate:"gte=1,lte=65535"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	assert.Equal(t, "object", m["type"])
-+	assert.Equal(t, true, hasRequired(m, "email"))
-+	assert.Equal(t, "email", prop(m, "email")["format"])
-+	port := prop(m, "port")
-+	assert.Equal(t, "integer", port["type"])
-+	assert.Equal(t, float64(1), port["minimum"])
-+	assert.Equal(t, float64(65535), port["maximum"])
-+}
-+
-+func TestGenerate_jsonTagNames(t *testing.T) {
-+	type cfg struct {
-+		Mail string `json:"e-mail" validate:"required"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	_, ok := m["properties"].(map[string]any)["e-mail"]
-+	assert.Equal(t, true, ok)
-+	assert.Equal(t, true, hasRequired(m, "e-mail"))
-+}
-+
-+func TestGenerate_skipField(t *testing.T) {
-+	type cfg struct {
-+		Secret string `json:"secret" validate:"-"`
-+		Public string `json:"public"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	props, _ := m["properties"].(map[string]any)
-+	_, has := props["secret"]
-+	assert.Equal(t, false, has)
-+}
-+
-+func TestGenerate_omitemptyNotRequired(t *testing.T) {
-+	type cfg struct {
-+		X string `json:"x,omitempty" validate:"omitempty"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	_, ok := m["properties"].(map[string]any)["x"]
-+	assert.Equal(t, true, ok)
-+	assert.Equal(t, false, hasRequired(m, "x"))
-+}
-+
-+func TestGenerate_nestedStructDive(t *testing.T) {
-+	type inner struct {
-+		Name string `json:"name" validate:"required"`
-+	}
-+	type cfg struct {
-+		Inner inner `json:"inner" validate:"dive"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	innerSchema := prop(m, "inner")
-+	innerProps, _ := innerSchema["properties"].(map[string]any)
-+	assert.NotEqual(t, nil, innerProps)
-+	nameSchema, _ := innerProps["name"].(map[string]any)
-+	assert.Equal(t, "string", nameSchema["type"])
-+	innerReq := requiredList(innerSchema)
-+	assert.Equal(t, []string{"name"}, innerReq)
-+}
-+
-+func TestGenerate_sliceDive(t *testing.T) {
-+	type item struct {
-+		ID int `json:"id" validate:"required"`
-+	}
-+	type cfg struct {
-+		Items []item `json:"items" validate:"dive,gt=0"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	items := prop(m, "items")
-+	assert.Equal(t, "array", items["type"])
-+	itemSchema, _ := items["items"].(map[string]any)
-+	itemProps, _ := itemSchema["properties"].(map[string]any)
-+	assert.NotEqual(t, nil, itemProps)
-+	assert.Equal(t, float64(1), items["minItems"])
-+}
-+
-+func TestGenerate_mapDive(t *testing.T) {
-+	type val struct {
-+		Count int `json:"count" validate:"gte=0"`
-+	}
-+	type cfg struct {
-+		Counts map[string]val `json:"counts" validate:"dive"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	counts := prop(m, "counts")
-+	assert.Equal(t, "object", counts["type"])
-+	addl, _ := counts["additionalProperties"].(map[string]any)
-+	addlProps, _ := addl["properties"].(map[string]any)
-+	assert.NotEqual(t, nil, addlProps["count"])
-+}
-+
-+func TestGenerate_oneof(t *testing.T) {
-+	type cfg struct {
-+		Mode string `json:"mode" validate:"oneof=a b c"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	mode := prop(m, "mode")
-+	enum, _ := mode["enum"].([]any)
-+	assert.Equal(t, []any{"a", "b", "c"}, enum)
-+}
-+
-+func TestGenerate_pointerNullable(t *testing.T) {
-+	type cfg struct {
-+		Label *string `json:"label"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	label := prop(m, "label")
-+	assert.Equal(t, "string", label["type"])
-+	assert.Equal(t, true, label["nullable"])
-+	assert.Equal(t, false, hasRequired(m, "label"))
-+}
-+
-+func TestGenerate_unsupportedCrossFieldIgnored(t *testing.T) {
-+	type cfg struct {
-+		A string `json:"a" validate:"required_without=Other"`
-+		B string `json:"b"`
-+	}
-+	b, err := Generate(cfg{})
-+	assert.Equal(t, nil, err)
-+	m := unmarshalSchema(t, b)
-+	_, ok := m["properties"].(map[string]any)["a"]
-+	assert.Equal(t, true, ok)
-+	_, has := m["dependentRequired"]
-+	assert.Equal(t, false, has)
-+}
-+
-+func TestGenerate_nonStructError(t *testing.T) {
-+	_, err := Generate(42)
-+	assert.NotEqual(t, nil, err)
-+}
-+
-+func TestGenerateSchema_map(t *testing.T) {
-+	type cfg struct {
-+		Name string `validate:"required"`
-+	}
-+	m, err := GenerateSchema(cfg{})
-+	assert.Equal(t, nil, err)
-+	assert.Equal(t, defaultDraft, m["$schema"])
-+}
-diff --git a/non-standard/jsonschema/reflect.go b/non-standard/jsonschema/reflect.go
-new file mode 100644
-index 0000000..c2c459f
---- /dev/null
-+++ b/non-standard/jsonschema/reflect.go
-@@ -0,0 +1,320 @@
-+package jsonschema
-+
-+import (
-+	"reflect"
-+)
-+
-+type generator struct {
-+	cfg *config
-+}
-+
-+func (g *generator) schemaForType(rt reflect.Type, tags *fieldTags) map[string]any {
-+	for rt.Kind() == reflect.Ptr {
-+		rt = rt.Elem()
-+	}
-+	schema := g.typeSchema(rt, tags)
-+	if tags != nil && tags.afterDive != nil {
-+		inner := g.schemaForType(rt, tags.afterDive)
-+		switch rt.Kind() {
-+		case reflect.Struct:
-+			if props, ok := inner["properties"]; ok {
-+				schema["properties"] = props
-+			}
-+			if req, ok := inner["required"]; ok {
-+				schema["required"] = req
-+			}
-+		case reflect.Slice, reflect.Array:
-+			schema["items"] = inner
-+		case reflect.Map:
-+			schema["additionalProperties"] = inner
-+		}
-+	}
-+	return schema
-+}
-+
-+func (g *generator) typeSchema(rt reflect.Type, tags *fieldTags) map[string]any {
-+	schema := make(map[string]any)
-+	if tags != nil && tags.booleanType {
-+		schema["type"] = "boolean"
-+		return schema
-+	}
-+	switch rt.Kind() {
-+	case reflect.String:
-+		schema["type"] = "string"
-+		g.applyStringConstraints(schema, tags)
-+	case reflect.Bool:
-+		schema["type"] = "boolean"
-+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-+		schema["type"] = "integer"
-+		g.applyNumericConstraints(schema, tags, true)
-+	case reflect.Float32, reflect.Float64:
-+		schema["type"] = "number"
-+		g.applyNumericConstraints(schema, tags, false)
-+	case reflect.Slice, reflect.Array:
-+		schema["type"] = "array"
-+		elem := rt.Elem()
-+		itemTags := &fieldTags{}
-+		if tags != nil && tags.afterDive != nil {
-+			itemTags = tags.afterDive
-+		}
-+		schema["items"] = g.schemaForType(elem, itemTags)
-+		g.applyArrayConstraints(schema, tags)
-+	case reflect.Map:
-+		schema["type"] = "object"
-+		valTags := &fieldTags{}
-+		if tags != nil && tags.afterDive != nil {
-+			valTags = tags.afterDive
-+		}
-+		schema["additionalProperties"] = g.schemaForType(rt.Elem(), valTags)
-+	case reflect.Struct:
-+		g.buildStructSchema(rt, schema, tags)
-+	default:
-+		schema["type"] = "string"
-+	}
-+	if tags != nil {
-+		g.applyCommonConstraints(schema, tags)
-+	}
-+	return schema
-+}
-+
-+func (g *generator) buildStructSchema(rt reflect.Type, schema map[string]any, tags *fieldTags) {
-+	schema["type"] = "object"
-+	props := make(map[string]any)
-+	var required []string
-+	for i := 0; i < rt.NumField(); i++ {
-+		fld := rt.Field(i)
-+		if fld.Anonymous {
-+			embedded := fld.Type
-+			for embedded.Kind() == reflect.Ptr {
-+				embedded = embedded.Elem()
-+			}
-+			if embedded.Kind() == reflect.Struct {
-+				sub := g.schemaForStructFields(embedded)
-+				for k, v := range sub.props {
-+					props[k] = v
-+				}
-+				required = append(required, sub.required...)
-+			}
-+			continue
-+		}
-+		if len(fld.PkgPath) > 0 {
-+			continue
-+		}
-+		vtag := fld.Tag.Get(g.cfg.tagName)
-+		ft := parseTags(vtag, g.cfg.tagName)
-+		if ft.skip {
-+			continue
-+		}
-+		name := g.fieldName(fld)
-+		if name == "" || name == "-" {
-+			continue
-+		}
-+		ftags := ft
-+		if ft.dive && ft.afterDive != nil {
-+			ftags = mergeTags(ft, ft.afterDive)
-+		}
-+		fieldSchema := g.fieldSchema(fld.Type, ft, ftags)
-+		props[name] = fieldSchema
-+		if g.fieldRequired(fld.Type, ft) {
-+			required = append(required, name)
-+		}
-+	}
-+	schema["properties"] = props
-+	if len(required) > 0 {
-+		schema["required"] = required
-+	}
-+}
-+
-+type structFieldsResult struct {
-+	props    map[string]any
-+	required []string
-+}
-+
-+func (g *generator) schemaForStructFields(rt reflect.Type) structFieldsResult {
-+	s := make(map[string]any)
-+	g.buildStructSchema(rt, s, nil)
-+	props, _ := s["properties"].(map[string]any)
-+	req, _ := s["required"].([]string)
-+	return structFieldsResult{props: props, required: req}
-+}
-+
-+func (g *generator) fieldSchema(rt reflect.Type, ft *fieldTags, constraintTags *fieldTags) map[string]any {
-+	isPtr := rt.Kind() == reflect.Ptr
-+	elem := rt
-+	for elem.Kind() == reflect.Ptr {
-+		elem = elem.Elem()
-+	}
-+	innerTags := ft
-+	if ft.dive && ft.afterDive != nil {
-+		innerTags = ft.afterDive
-+	} else if !ft.dive {
-+		innerTags = constraintTags
-+	}
-+	schema := g.schemaForType(elem, innerTags)
-+	if isPtr && !g.fieldRequired(rt, ft) {
-+		schema["nullable"] = true
-+	}
-+	return schema
-+}
-+
-+func (g *generator) fieldRequired(rt reflect.Type, ft *fieldTags) bool {
-+	if ft.omitEmpty || ft.omitNil || ft.omitZero {
-+		return false
-+	}
-+	if !ft.required {
-+		return false
-+	}
-+	elem := rt
-+	for elem.Kind() == reflect.Ptr {
-+		elem = elem.Elem()
-+	}
-+	if elem.Kind() == reflect.Struct {
-+		return g.cfg.requiredStructEnable
-+	}
-+	return true
-+}
-+
-+func (g *generator) fieldName(fld reflect.StructField) string {
-+	if g.cfg.useJSONTag {
-+		jt := fld.Tag.Get("json")
-+		if jt != "" {
-+			name := jt
-+			if idx := indexComma(jt); idx >= 0 {
-+				name = jt[:idx]
-+			}
-+			if name == "-" {
-+				return ""
-+			}
-+			return name
-+		}
-+	}
-+	return fld.Name
-+}
-+
-+func indexComma(s string) int {
-+	for i := 0; i < len(s); i++ {
-+		if s[i] == ',' {
-+			return i
-+		}
-+	}
-+	return -1
-+}
-+
-+func (g *generator) applyCommonConstraints(schema map[string]any, tags *fieldTags) {
-+	if tags == nil {
-+		return
-+	}
-+	if len(tags.oneof) > 0 {
-+		enums := make([]any, len(tags.oneof))
-+		for i, v := range tags.oneof {
-+			enums[i] = v
-+		}
-+		schema["enum"] = enums
-+	}
-+	if tags.format != "" {
-+		schema["format"] = tags.format
-+	}
-+	if tags.uniqueItems {
-+		schema["uniqueItems"] = true
-+	}
-+}
-+
-+func (g *generator) applyStringConstraints(schema map[string]any, tags *fieldTags) {
-+	if tags == nil {
-+		return
-+	}
-+	if tags.minLen != nil {
-+		schema["minLength"] = *tags.minLen
-+	}
-+	if tags.maxLen != nil {
-+		schema["maxLength"] = *tags.maxLen
-+	}
-+	if tags.min != nil {
-+		schema["minLength"] = int(*tags.min)
-+	}
-+	if tags.max != nil {
-+		schema["maxLength"] = int(*tags.max)
-+	}
-+	if tags.eqStr != "" {
-+		schema["minLength"] = len(tags.eqStr)
-+		schema["maxLength"] = len(tags.eqStr)
-+	}
-+}
-+
-+func (g *generator) applyNumericConstraints(schema map[string]any, tags *fieldTags, integer bool) {
-+	if tags == nil {
-+		return
-+	}
-+	setNum := func(key string, v float64) {
-+		if integer {
-+			schema[key] = int(v)
-+		} else {
-+			schema[key] = v
-+		}
-+	}
-+	if tags.eq != nil {
-+		setNum("minimum", *tags.eq)
-+		setNum("maximum", *tags.eq)
-+	}
-+	if tags.min != nil {
-+		setNum("minimum", *tags.min)
-+	}
-+	if tags.max != nil {
-+		setNum("maximum", *tags.max)
-+	}
-+	if tags.gt != nil {
-+		schema["exclusiveMinimum"] = *tags.gt
-+		if integer {
-+			schema["exclusiveMinimum"] = int(*tags.gt)
-+		}
-+	}
-+	if tags.gte != nil {
-+		setNum("minimum", *tags.gte)
-+	}
-+	if tags.lt != nil {
-+		schema["exclusiveMaximum"] = *tags.lt
-+		if integer {
-+			schema["exclusiveMaximum"] = int(*tags.lt)
-+		}
-+	}
-+	if tags.lte != nil {
-+		setNum("maximum", *tags.lte)
-+	}
-+}
-+
-+func (g *generator) applyArrayConstraints(schema map[string]any, tags *fieldTags) {
-+	if tags == nil {
-+		return
-+	}
-+	if tags.minLen != nil {
-+		schema["minItems"] = *tags.minLen
-+	}
-+	if tags.maxLen != nil {
-+		schema["maxItems"] = *tags.maxLen
-+	}
-+	if tags.min != nil {
-+		schema["minItems"] = int(*tags.min)
-+	}
-+	if tags.max != nil {
-+		schema["maxItems"] = int(*tags.max)
-+	}
-+	if tags.gt != nil {
-+		n := int(*tags.gt)
-+		schema["minItems"] = n + 1
-+	}
-+	if tags.gte != nil {
-+		schema["minItems"] = int(*tags.gte)
-+	}
-+	if tags.lt != nil {
-+		schema["maxItems"] = int(*tags.lt) - 1
-+	}
-+	if tags.lte != nil {
-+		schema["maxItems"] = int(*tags.lte)
-+	}
-+	if tags.eq != nil {
-+		n := int(*tags.eq)
-+		schema["minItems"] = n
-+		schema["maxItems"] = n
-+	}
-+}
-diff --git a/non-standard/jsonschema/tags.go b/non-standard/jsonschema/tags.go
-new file mode 100644
-index 0000000..117edb1
---- /dev/null
-+++ b/non-standard/jsonschema/tags.go
-@@ -0,0 +1,216 @@
-+package jsonschema
-+
-+import (
-+	"strconv"
 +	"strings"
 +)
 +
-+const (
-+	tagSeparator    = ","
-+	tagKeySeparator = "="
-+	skipTag         = "-"
-+	diveTag         = "dive"
-+	keysTag         = "keys"
-+	endKeysTag      = "endkeys"
++const jsonSchemaDraftURI = "https://json-schema.org/draft/2020-12/schema"
++
++var jsonSchemaCrossFieldTags = map[string]struct{}{
++	"eqcsfield": {}, "eqfield": {}, "fieldcontains": {}, "fieldexcludes": {},
++	"gtcsfield": {}, "gtecsfield": {}, "gtefield": {}, "gtfield": {},
++	"ltcsfield": {}, "ltecsfield": {}, "ltefield": {}, "ltfield": {},
++	"necsfield": {}, "nefield": {},
++	"required_with": {}, "required_with_all": {}, "required_without": {}, "required_without_all": {},
++	"required_if": {}, "required_unless": {}, "excluded_with": {}, "excluded_with_all": {},
++	"excluded_without": {}, "excluded_without_all": {}, "excluded_if": {}, "excluded_unless": {},
++	"skip_unless": {},
++}
++
++var jsonSchemaPatternTags = map[string]string{
++	"alpha":          alphaRegexString,
++	"alphanum":       alphaNumericRegexString,
++	"numeric":        numericRegexString,
++	"number":         numberRegexString,
++	"hexadecimal":    hexadecimalRegexString,
++	"hexcolor":       hexColorRegexString,
++	"base64":         base64RegexString,
++	"base32":         base32RegexString,
++	"uuid":           uUIDRegexString,
++	"uuid3":          uUID3RegexString,
++	"uuid4":          uUID4RegexString,
++	"uuid5":          uUID5RegexString,
++	"uuid_rfc4122":   uUIDRFC4122RegexString,
++}
++
++var jsonSchemaFormatTags = map[string]string{
++	"email": "email",
++	"url":   "uri",
++	"uri":   "uri",
++	"ipv4":  "ipv4",
++	"ipv6":  "ipv6",
++}
++
++// JSONSchema generates a JSON Schema (Draft 2020-12) document from the validate tags on s.
++// s must be a struct or a pointer to a struct, like Struct.
++func (v *Validate) JSONSchema(s interface{}) ([]byte, error) {
++	val := reflect.ValueOf(s)
++	typ := val.Type()
++	if val.Kind() == reflect.Ptr && !val.IsNil() {
++		typ = typ.Elem()
++	}
++
++	schema, err := v.JSONSchemaFromType(typ)
++	if err != nil {
++		return nil, err
++	}
++
++	return json.Marshal(schema)
++}
++
++// JSONSchemaFromType generates a JSON Schema (Draft 2020-12) map from the validate tags on typ.
++func (v *Validate) JSONSchemaFromType(typ reflect.Type) (map[string]any, error) {
++	if typ.Kind() == reflect.Ptr {
++		typ = typ.Elem()
++	}
++
++	if typ.Kind() != reflect.Struct || typ.ConvertibleTo(timeType) {
++		return nil, &InvalidValidationError{Type: typ}
++	}
++
++	cs := v.extractStructCache(reflect.Zero(typ), typ.Name())
++	schema := v.generateJSONSchema(typ, cs)
++	schema["$schema"] = jsonSchemaDraftURI
++
++	return schema, nil
++}
++
++func (v *Validate) generateJSONSchema(typ reflect.Type, cs *cStruct) map[string]any {
++	properties := make(map[string]any)
++	required := make([]string, 0)
++
++	for _, cf := range cs.fields {
++		fld := typ.Field(cf.idx)
++		name, skip := v.jsonSchemaPropertyName(fld, cf)
++		if skip || name == "" {
++			continue
++		}
++
++		fieldTyp := fld.Type
++		propSchema, fieldRequired := v.jsonSchemaFieldSchema(fieldTyp, cf.cTags)
++		properties[name] = propSchema
++		if fieldRequired {
++			required = append(required, name)
++		}
++	}
++
++	schema := map[string]any{
++		"type":       "object",
++		"properties": properties,
++	}
++
++	if len(required) > 0 {
++		schema["required"] = required
++	}
++
++	return schema
++}
++
++func (v *Validate) jsonSchemaPropertyName(fld reflect.StructField, cf *cField) (string, bool) {
++	if tag := fld.Tag.Get("json"); tag != "" {
++		name, _, _ := strings.Cut(tag, ",")
++		if name == "-" {
++			return "", true
++		}
++	}
++
++	if v.hasTagNameFunc {
++		name := v.tagNameFunc(fld)
++		if len(name) > 0 || v.omitBlankFieldNames {
++			if name == "" {
++				return "", true
++			}
++			return name, false
++		}
++	}
++
++	if tag := fld.Tag.Get("json"); tag != "" {
++		name, _, _ := strings.Cut(tag, ",")
++		if name != "" {
++			return name, false
++		}
++	}
++
++	return cf.name, false
++}
++
++func (v *Validate) jsonSchemaFieldSchema(fieldTyp reflect.Type, ct *cTag) (map[string]any, bool) {
++	fieldTyp = dereferenceType(fieldTyp)
++
++	containerTags, diveTags := splitJSONSchemaDiveTags(ct)
++	schema := v.jsonSchemaBaseType(fieldTyp)
++
++	var fieldRequired bool
++	v.applyJSONSchemaTags(schema, containerTags, fieldTyp, &fieldRequired)
++
++	if diveTags != nil {
++		elemTyp := jsonSchemaElemType(fieldTyp)
++		if items, ok := schema["items"].(map[string]any); ok {
++			var itemRequired bool
++			v.applyJSONSchemaTags(items, diveTags, elemTyp, &itemRequired)
++		} else if additional, ok := schema["additionalProperties"].(map[string]any); ok {
++			var valueRequired bool
++			v.applyJSONSchemaTags(additional, diveTags, elemTyp, &valueRequired)
++		}
++	}
++
++	return schema, fieldRequired
++}
++
++func splitJSONSchemaDiveTags(ct *cTag) (container, dive *cTag) {
++	if ct == nil {
++		return nil, nil
++	}
++
++	var head *cTag
++	var tail *cTag
++
++	for c := ct; c != nil; c = c.next {
++		if c.typeof == typeDive {
++			return head, c.next
++		}
++
++		node := &cTag{
++			tag:                  c.tag,
++			aliasTag:             c.aliasTag,
++			actualAliasTag:       c.actualAliasTag,
++			param:                c.param,
++			keys:                 c.keys,
++			next:                 nil,
++			fn:                   c.fn,
++			typeof:               c.typeof,
++			hasTag:               c.hasTag,
++			hasAlias:             c.hasAlias,
++			hasParam:             c.hasParam,
++			isBlockEnd:           c.isBlockEnd,
++			runValidationWhenNil: c.runValidationWhenNil,
++		}
++
++		if head == nil {
++			head = node
++			tail = node
++		} else {
++			tail.next = node
++			tail = node
++		}
++	}
++
++	return head, nil
++}
++
++func (v *Validate) jsonSchemaBaseType(typ reflect.Type) map[string]any {
++	typ = dereferenceType(typ)
++
++	if typ.ConvertibleTo(timeType) {
++		return map[string]any{
++			"type":   "string",
++			"format": "date-time",
++		}
++	}
++
++	switch typ.Kind() {
++	case reflect.String:
++		return map[string]any{"type": "string"}
++	case reflect.Bool:
++		return map[string]any{"type": "boolean"}
++	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
++		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
++		return map[string]any{"type": "integer"}
++	case reflect.Float32, reflect.Float64:
++		return map[string]any{"type": "number"}
++	case reflect.Slice, reflect.Array:
++		elemSchema, _ := v.jsonSchemaFieldSchema(typ.Elem(), nil)
++		return map[string]any{
++			"type":  "array",
++			"items": elemSchema,
++		}
++	case reflect.Map:
++		valueSchema, _ := v.jsonSchemaFieldSchema(typ.Elem(), nil)
++		return map[string]any{
++			"type":                 "object",
++			"additionalProperties": valueSchema,
++		}
++	case reflect.Struct:
++		cs := v.extractStructCache(reflect.Zero(typ), typ.Name())
++		return v.generateJSONSchema(typ, cs)
++	default:
++		return map[string]any{}
++	}
++}
++
++func jsonSchemaElemType(typ reflect.Type) reflect.Type {
++	typ = dereferenceType(typ)
++	switch typ.Kind() {
++	case reflect.Slice, reflect.Array:
++		return typ.Elem()
++	case reflect.Map:
++		return typ.Elem()
++	default:
++		return typ
++	}
++}
++
++func dereferenceType(typ reflect.Type) reflect.Type {
++	for typ.Kind() == reflect.Ptr {
++		typ = typ.Elem()
++	}
++	return typ
++}
++
++func (v *Validate) applyJSONSchemaTags(schema map[string]any, ct *cTag, fieldTyp reflect.Type, fieldRequired *bool) {
++	for c := ct; c != nil; c = c.next {
++		switch c.typeof {
++		case typeOmitEmpty, typeOmitZero, typeOmitNil, typeIsDefault:
++			*fieldRequired = false
++			continue
++		case typeStructOnly, typeNoStructLevel, typeKeys, typeEndKeys, typeOr:
++			continue
++		case typeDive:
++			continue
++		}
++
++		if !c.hasTag {
++			continue
++		}
++
++		if _, skip := jsonSchemaCrossFieldTags[c.tag]; skip {
++			continue
++		}
++
++		switch c.tag {
++		case requiredTag:
++			*fieldRequired = true
++		case "oneof":
++			schema["enum"] = parseOneOfParam2(c.param)
++		default:
++			v.applyJSONSchemaConstraint(schema, c.tag, c.param, fieldTyp)
++		}
++	}
++}
++
++func (v *Validate) applyJSONSchemaConstraint(schema map[string]any, tag, param string, fieldTyp reflect.Type) {
++	fieldTyp = dereferenceType(fieldTyp)
++
++	switch tag {
++	case "min", "max", "len", "gt", "gte", "lt", "lte":
++		v.applyJSONSchemaBound(schema, tag, param, fieldTyp)
++	default:
++		if format, ok := jsonSchemaFormatTags[tag]; ok {
++			schema["format"] = format
++		}
++		if pattern, ok := jsonSchemaPatternTags[tag]; ok {
++			schema["pattern"] = pattern
++		}
++	}
++}
++
++func (v *Validate) applyJSONSchemaBound(schema map[string]any, tag, param string, fieldTyp reflect.Type) {
++	fieldTyp = dereferenceType(fieldTyp)
++
++	switch fieldTyp.Kind() {
++	case reflect.String:
++		v.applyJSONSchemaStringBound(schema, tag, param)
++	case reflect.Slice, reflect.Array:
++		v.applyJSONSchemaArrayBound(schema, tag, param)
++	default:
++		integer := fieldTyp.Kind() != reflect.Float32 && fieldTyp.Kind() != reflect.Float64
++		v.applyJSONSchemaNumberBound(schema, tag, param, integer)
++	}
++}
++
++func (v *Validate) applyJSONSchemaStringBound(schema map[string]any, tag, param string) {
++	n := asInt(param)
++	switch tag {
++	case "min", "gte":
++		schema["minLength"] = n
++	case "max", "lte":
++		schema["maxLength"] = n
++	case "len":
++		schema["minLength"] = n
++		schema["maxLength"] = n
++	case "gt":
++		schema["minLength"] = n + 1
++	case "lt":
++		if n > 0 {
++			schema["maxLength"] = n - 1
++		}
++	}
++}
++
++func (v *Validate) applyJSONSchemaArrayBound(schema map[string]any, tag, param string) {
++	n := asInt(param)
++	switch tag {
++	case "min", "gte":
++		schema["minItems"] = n
++	case "max", "lte":
++		schema["maxItems"] = n
++	case "len":
++		schema["minItems"] = n
++		schema["maxItems"] = n
++	case "gt":
++		schema["minItems"] = n + 1
++	case "lt":
++		if n > 0 {
++			schema["maxItems"] = n - 1
++		}
++	}
++}
++
++func (v *Validate) applyJSONSchemaNumberBound(schema map[string]any, tag, param string, integer bool) {
++	var f float64
++	if integer {
++		f = float64(asInt(param))
++	} else {
++		f = asFloat64(param)
++	}
++
++	switch tag {
++	case "min", "gte":
++		schema["minimum"] = numericJSONValue(f, integer)
++	case "max", "lte":
++		schema["maximum"] = numericJSONValue(f, integer)
++	case "len":
++		schema["minimum"] = numericJSONValue(f, integer)
++		schema["maximum"] = numericJSONValue(f, integer)
++	case "gt":
++		schema["exclusiveMinimum"] = numericJSONValue(f, integer)
++	case "lt":
++		schema["exclusiveMaximum"] = numericJSONValue(f, integer)
++	}
++}
++
++func numericJSONValue(f float64, integer bool) any {
++	if integer {
++		return int64(f)
++	}
++	return f
++}
+diff --git a/jsonschema_test.go b/jsonschema_test.go
+new file mode 100644
+index 0000000..81e33aa
+--- /dev/null
++++ b/jsonschema_test.go
+@@ -0,0 +1,231 @@
++package validator
++
++import (
++	"encoding/json"
++	"reflect"
++	"strings"
++	"testing"
++
++	. "github.com/go-playground/assert/v2"
 +)
 +
-+type fieldTags struct {
-+	skip           bool
-+	required       bool
-+	omitEmpty      bool
-+	omitNil        bool
-+	omitZero       bool
-+	dive           bool
-+	keys           bool
-+	afterDive      *fieldTags
-+	min            *float64
-+	max            *float64
-+	minLen         *int
-+	maxLen         *int
-+	eq             *float64
-+	eqStr          string
-+	gt             *float64
-+	gte            *float64
-+	lt             *float64
-+	lte            *float64
-+	oneof          []string
-+	format         string
-+	uniqueItems    bool
-+	booleanType    bool
++func jsonSchemaUnmarshal(t *testing.T, data []byte) map[string]any {
++	t.Helper()
++
++	var schema map[string]any
++	err := json.Unmarshal(data, &schema)
++	Equal(t, err, nil)
++
++	return schema
 +}
 +
-+func parseTags(tag string, tagName string) *fieldTags {
-+	if tag == "" {
-+		return &fieldTags{}
++func TestJSONSchema_simpleConfig(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Name  string `json:"name" validate:"required,min=1,max=64"`
++		Port  int    `json:"port" validate:"required,gte=1,lte=65535"`
++		Debug bool   `json:"debug"`
 +	}
-+	if tag == skipTag {
-+		return &fieldTags{skip: true}
-+	}
-+	return parseTagsRecursive(tag)
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	Equal(t, schema["type"], "object")
++	Equal(t, schema["$schema"], jsonSchemaDraftURI)
++
++	props := schema["properties"].(map[string]any)
++	name := props["name"].(map[string]any)
++	Equal(t, name["type"], "string")
++	Equal(t, name["minLength"], float64(1))
++	Equal(t, name["maxLength"], float64(64))
++
++	port := props["port"].(map[string]any)
++	Equal(t, port["type"], "integer")
++	Equal(t, port["minimum"], float64(1))
++	Equal(t, port["maximum"], float64(65535))
++
++	required := schema["required"].([]any)
++	Equal(t, len(required), 2)
++	Equal(t, required[0], "name")
++	Equal(t, required[1], "port")
 +}
 +
-+func parseTagsRecursive(tag string) *fieldTags {
-+	ft := &fieldTags{}
-+	tags := strings.Split(tag, tagSeparator)
-+	var diveIdx int = -1
-+	for i := 0; i < len(tags); i++ {
-+		t := strings.TrimSpace(tags[i])
-+		switch t {
-+		case skipTag:
-+			ft.skip = true
-+			return ft
-+		case diveTag:
-+			ft.dive = true
-+			diveIdx = i
-+		case keysTag:
-+			ft.keys = true
-+			for i+1 < len(tags) && tags[i+1] != endKeysTag {
-+				i++
-+			}
-+		case endKeysTag:
-+		case "omitempty":
-+			ft.omitEmpty = true
-+		case "omitnil":
-+			ft.omitNil = true
-+		case "omitzero":
-+			ft.omitZero = true
-+		case "required":
-+			ft.required = true
-+		case "unique":
-+			ft.uniqueItems = true
-+		case "boolean":
-+			ft.booleanType = true
-+		case "email", "url", "uri", "uuid", "uuid4", "ipv4", "ipv6":
-+			ft.format = t
-+		default:
-+			applyParamTag(ft, t)
-+		}
++func TestJSONSchema_omitemptyNotRequired(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Opt string `json:"opt" validate:"omitempty,min=1"`
 +	}
-+	if diveIdx >= 0 && diveIdx+1 < len(tags) {
-+		rest := strings.Join(tags[diveIdx+1:], tagSeparator)
-+		// strip keys/endkeys block from dive tail
-+		if idx := strings.Index(rest, keysTag); idx >= 0 {
-+			if end := strings.Index(rest, endKeysTag); end >= 0 {
-+				after := rest[end+len(endKeysTag):]
-+				rest = strings.TrimPrefix(after, tagSeparator)
-+			}
-+		}
-+		rest = strings.TrimPrefix(rest, tagSeparator)
-+		if rest != "" && rest != keysTag {
-+			ft.afterDive = parseTagsRecursive(rest)
-+		} else {
-+			ft.afterDive = &fieldTags{}
-+		}
-+	}
-+	return ft
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	_, hasRequired := schema["required"]
++	Equal(t, hasRequired, false)
++
++	opt := schema["properties"].(map[string]any)["opt"].(map[string]any)
++	Equal(t, opt["minLength"], float64(1))
 +}
 +
-+func applyParamTag(ft *fieldTags, t string) {
-+	parts := strings.SplitN(t, tagKeySeparator, 2)
-+	key := parts[0]
-+	param := ""
-+	if len(parts) > 1 {
-+		param = parts[1]
++func TestJSONSchema_skipDashTag(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Skip string `json:"skip" validate:"-"`
++		Keep string `json:"keep"`
 +	}
-+	switch key {
-+	case "min", "max", "eq", "gt", "gte", "lt", "lte":
-+		if f, err := strconv.ParseFloat(param, 64); err == nil {
-+			switch key {
-+			case "min":
-+				ft.min = &f
-+			case "max":
-+				ft.max = &f
-+			case "eq":
-+				ft.eq = &f
-+			case "gt":
-+				ft.gt = &f
-+			case "gte":
-+				ft.gte = &f
-+			case "lt":
-+				ft.lt = &f
-+			case "lte":
-+				ft.lte = &f
-+			}
-+		}
-+	case "len":
-+		if n, err := strconv.Atoi(param); err == nil {
-+			switch {
-+			case ft.minLen == nil:
-+				ft.minLen = &n
-+				ft.maxLen = &n
-+			default:
-+				ft.minLen = &n
-+				ft.maxLen = &n
-+			}
-+		}
-+	case "oneof":
-+		ft.oneof = strings.Fields(param)
-+	default:
-+		// cross-field and unknown tags ignored in v1
-+	}
-+	if key == "eq" && param != "" && ft.eq == nil {
-+		ft.eqStr = param
-+	}
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	props := schema["properties"].(map[string]any)
++	_, hasSkip := props["skip"]
++	Equal(t, hasSkip, false)
++	_, hasKeep := props["keep"]
++	Equal(t, hasKeep, true)
 +}
 +
-+func mergeTags(parent, child *fieldTags) *fieldTags {
-+	if child == nil {
-+		return parent
++func TestJSONSchema_jsonDashOmitted(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Hidden string `json:"-" validate:"required"`
++		Shown  string `json:"shown"`
 +	}
-+	out := *parent
-+	if child.required {
-+		out.required = true
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	props := schema["properties"].(map[string]any)
++	_, hasHidden := props["Hidden"]
++	Equal(t, hasHidden, false)
++}
++
++func TestJSONSchema_oneofEnum(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Mode string `json:"mode" validate:"oneof=dev prod"`
 +	}
-+	if child.omitEmpty {
-+		out.omitEmpty = true
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	mode := schema["properties"].(map[string]any)["mode"].(map[string]any)
++	enum := mode["enum"].([]any)
++	Equal(t, len(enum), 2)
++	Equal(t, enum[0], "dev")
++	Equal(t, enum[1], "prod")
++}
++
++func TestJSONSchema_nestedStruct(t *testing.T) {
++	validate := New()
++
++	type Child struct {
++		Name string `json:"name" validate:"required"`
 +	}
-+	if child.omitNil {
-+		out.omitNil = true
++
++	type Parent struct {
++		Child Child `json:"child" validate:"required"`
 +	}
-+	if child.omitZero {
-+		out.omitZero = true
++
++	data, err := validate.JSONSchema(Parent{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	required := schema["required"].([]any)
++	Equal(t, required[0], "child")
++
++	child := schema["properties"].(map[string]any)["child"].(map[string]any)
++	Equal(t, child["type"], "object")
++	childRequired := child["required"].([]any)
++	Equal(t, childRequired[0], "name")
++}
++
++func TestJSONSchema_diveSlice(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Tags []string `json:"tags" validate:"dive,min=1"`
 +	}
-+	if child.min != nil {
-+		out.min = child.min
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	tags := schema["properties"].(map[string]any)["tags"].(map[string]any)
++	Equal(t, tags["type"], "array")
++
++	items := tags["items"].(map[string]any)
++	Equal(t, items["type"], "string")
++	Equal(t, items["minLength"], float64(1))
++}
++
++func TestJSONSchema_registerTagNameFunc(t *testing.T) {
++	validate := New()
++	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
++		name := strings.SplitN(fld.Tag.Get("schema"), ",", 2)[0]
++		if name == "-" {
++			return ""
++		}
++		return name
++	})
++
++	type A struct {
++		B string `schema:"b" validate:"required"`
++		C string `schema:"c" validate:"required"`
 +	}
-+	if child.max != nil {
-+		out.max = child.max
++
++	data, err := validate.JSONSchema(A{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	props := schema["properties"].(map[string]any)
++	_, hasB := props["b"]
++	Equal(t, hasB, true)
++	_, hasC := props["c"]
++	Equal(t, hasC, true)
++	_, hasCapitalB := props["B"]
++	Equal(t, hasCapitalB, false)
++}
++
++func TestJSONSchema_nonStructInput(t *testing.T) {
++	validate := New()
++
++	_, err := validate.JSONSchema("x")
++	NotEqual(t, err, nil)
++	_, ok := err.(*InvalidValidationError)
++	Equal(t, ok, true)
++}
++
++func TestJSONSchema_roundTripMarshal(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Name string `json:"name" validate:"required"`
 +	}
-+	if child.minLen != nil {
-+		out.minLen = child.minLen
++
++	data, err := validate.JSONSchema(Config{})
++	Equal(t, err, nil)
++
++	schema := jsonSchemaUnmarshal(t, data)
++	Equal(t, schema["$schema"], jsonSchemaDraftURI)
++}
++
++func TestJSONSchemaFromType(t *testing.T) {
++	validate := New()
++
++	type Config struct {
++		Name string `json:"name" validate:"required"`
 +	}
-+	if child.maxLen != nil {
-+		out.maxLen = child.maxLen
-+	}
-+	if child.eq != nil {
-+		out.eq = child.eq
-+	}
-+	if child.eqStr != "" {
-+		out.eqStr = child.eqStr
-+	}
-+	if child.gt != nil {
-+		out.gt = child.gt
-+	}
-+	if child.gte != nil {
-+		out.gte = child.gte
-+	}
-+	if child.lt != nil {
-+		out.lt = child.lt
-+	}
-+	if child.lte != nil {
-+		out.lte = child.lte
-+	}
-+	if len(child.oneof) > 0 {
-+		out.oneof = child.oneof
-+	}
-+	if child.format != "" {
-+		out.format = child.format
-+	}
-+	if child.uniqueItems {
-+		out.uniqueItems = true
-+	}
-+	if child.booleanType {
-+		out.booleanType = true
-+	}
-+	return &out
++
++	schema, err := validate.JSONSchemaFromType(reflect.TypeOf(Config{}))
++	Equal(t, err, nil)
++	Equal(t, schema["$schema"], jsonSchemaDraftURI)
 +}
 ```

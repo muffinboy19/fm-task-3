@@ -1,18 +1,13 @@
 {
   "go_installed": true,
   "go_binary": "/opt/homebrew/bin/go",
-  "patch_has_tests": true,
+  "patch_has_tests": false,
   "files_changed": [
-    "README.md",
-    "_examples/jsonschema/main.go",
-    "non-standard/jsonschema/jsonschema.go",
-    "non-standard/jsonschema/jsonschema_test.go",
-    "non-standard/jsonschema/reflect.go",
-    "non-standard/jsonschema/tags.go"
+    "README.md"
   ],
   "packages_tested": [],
   "apply_passed": false,
   "tests_passed": false,
   "overall_passed": false,
-  "test_output_preview": "git apply --check failed:\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory\n\n"
+  "test_output_preview": "git apply --check failed:\nerror: corrupt patch at line 15\n\n"
 }

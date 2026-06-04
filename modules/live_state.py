@@ -90,6 +90,7 @@ _STALE_RUN_FILES = (
     "code_generator_diagnosis.json",
     "code_generator_retry_raw.txt",
     "code_generator_retry_diagnosis.json",
+    "plan_check.json",
 )
 
 
@@ -110,8 +111,8 @@ def _step_status(steps: list, step_id: str) -> str:
 
 
 def _step_has_output(steps: list, step_id: str) -> bool:
-    """Expose file content only after a step finished (ok or fail)."""
-    return _step_status(steps, step_id) in ("ok", "fail")
+    """Expose file content only after a step finished (ok, fail, or warn)."""
+    return _step_status(steps, step_id) in ("ok", "fail", "warn")
 
 
 def patch_stats(patch: str) -> dict:
@@ -179,6 +180,11 @@ def build_live_payload(
         if _step_has_output(steps, "5")
         else None
     )
+    plan_check = validation or (
+        _read_json(output_dir / "plan_check.json")
+        if _step_has_output(steps, "5")
+        else None
+    )
     pr = (
         _read_text(output_dir / "pr_summary.md", max_chars=80_000)
         if _step_has_output(steps, "6")
@@ -209,6 +215,7 @@ def build_live_payload(
             "issue_raw": issue_raw,
             "issue_understanding": issue_understanding,
             "context": context,
+            "plan_check": plan_check,
             "validation": validation,
             "plan_md": plan,
             "pr_summary_md": pr,

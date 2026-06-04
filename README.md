@@ -1,6 +1,6 @@
 # Open Source Issue Solver for Go Repositories
 
-Agent that reads a GitHub issue from an open-source Go repo, plans and generates a fix, validates it with `go test`, and writes a PR summary — for gin, cobra, validator, golangci-lint, and similar projects.
+Agent that reads a GitHub issue from an open-source Go repo, plans and generates a fix, validates the patch against the plan, and writes a PR summary — for gin, cobra, validator, golangci-lint, and similar projects.
 
 ## Architecture
 
@@ -17,16 +17,15 @@ Cursor (or Gemini) reads the issue + context and writes a surgical fix plan in `
 Keeps scope tight: which files to change and what behavior to fix.
 
 **Step 4 — Patch generation**  
-The LLM produces a unified diff (`output/fix.patch`) aligned with the plan and Go style.  
-Can retry with validation errors fed back into the prompt.
+The LLM produces a unified diff (`output/fix.patch`) aligned with the plan and Go style.
 
 **Step 5 — Validation**  
-Applies the patch with `git apply`, runs `go test ./...`, and retries on failure.  
-Writes `output/validation_report.json` with apply and test results.
+An LLM compares `plan.md` and `fix.patch` for alignment (files, approach, tests).  
+Writes `output/validation_report.json` and `output/plan_check.json`; warns if the patch diverges from the plan.
 
 **Step 6 — PR summary**  
 The LLM drafts title and body for a pull request in `output/pr_summary.md`.  
-References the issue, plan, patch, and test outcome.
+References the issue, plan, patch, and validation outcome.
 
 ```
 main.py → issue_understanding → context_builder → code_reasoning_agent
@@ -55,16 +54,23 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-**Step 3 — Add your keys in `.env`**
+**Step 3 — Configure `.env`**
 
-Open `.env` and fill in these two values (same names as in `.env.example`):
+Add your Cursor LLM settings:
 
-| Variable | What to add |
-|----------|-------------|
-| `CURSOR_API_KEY` | Your Cursor API key (from the Cursor dashboard in your browser) |
-| `GITHUB_ISSUE_URL` | The GitHub issue to fix, e.g. `https://github.com/gin-gonic/gin/issues/1234` |
+```
+LLM_PROVIDER=cursor
+CURSOR_API_KEY=your_cursor_api_key_here
+CURSOR_MODEL=composer-2.5
+```
 
-Leave `LLM_PROVIDER=cursor` as in `.env.example`. The target repo is derived from `GITHUB_ISSUE_URL`, cloned into `test_repo/<repo>/`, and recorded in `output/repo.json` — no `GITHUB_REPO_PATH` in `.env`.
+Also set the issue to fix:
+
+```
+GITHUB_ISSUE_URL=https://github.com/gin-gonic/gin/issues/1234
+```
+
+The repo is cloned automatically from that URL into `test_repo/<repo>/` (saved in `output/repo.json`).
 
 **Step 4 — Run**
 

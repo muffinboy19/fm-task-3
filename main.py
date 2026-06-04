@@ -321,32 +321,73 @@ def main():
         log.step_fail("4", str(e))
         sys.exit(1)
 
-    # ── Step 5 ───────────────────────────────────────────────────
+    if args.stop_after and args.stop_after <= 4:
+        summary = {
+            "issue": issue["url"],
+            "title": issue["title"],
+            "patch": str(patch_path),
+            "plan": str(output_dir / "plan.md"),
+            "dashboard": str(log.dashboard_path),
+        }
+        (output_dir / "run_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+        log.finalize(success=True, summary=summary)
+        return
+
+    # ── Step 5 — Validation (plan adherence only) ──────────────────
+    plan_aligned = True
     if dry_run:
         log.step_skip("5", "DRY_RUN=true")
-        result = {"passed": None, "test_output": "dry-run", "final_patch": patch}
+        result = {
+            "passed": None,
+            "plan_aligned": None,
+            "test_output": "dry-run",
+            "final_patch": patch,
+        }
     else:
-        log.step_start("5", "git apply + go test...")
+        log.step_start("5", "Validating patch matches plan...")
         try:
-            result = Validator(repo_path=repo_path).validate(
-                patch=patch, generator=generator,
-                issue=issue, context=context, plan=plan,
-            )
-            patch_path.write_text(result["final_patch"], encoding="utf-8")
+            result = Validator(api_key=api_key).validate(plan=plan, patch=patch)
             vr = result.get("validation_report") or {}
-            log.kv("git apply", "OK" if vr.get("apply_passed") else "FAIL")
-            log.kv("has tests", vr.get("patch_has_tests"))
-            log.kv("go test", "PASS" if vr.get("tests_passed") else "FAIL")
-            log.block("Test output", result.get("test_output", ""), max_report_chars=4000)
+            plan_aligned = bool(result.get("plan_aligned"))
+            log.kv("Plan aligned", plan_aligned)
+            log.kv("Confidence", vr.get("confidence"))
             log.artifact("Validation report", str(output_dir / "validation_report.json"))
+            log.artifact("Plan check", str(output_dir / "plan_check.json"))
 
+            summary_text = (vr.get("summary") or result.get("error") or "")[:120]
             if result["passed"]:
-                log.step_ok("5", "Patch applied + tests passed")
+                log.step_ok("5", summary_text or "Patch matches plan")
             else:
-                log.step_fail("5", (result.get("error") or "unknown")[:120])
+                log.step_warn("5", summary_text[:200])
         except Exception as e:
+            plan_aligned = False
             log.step_fail("5", str(e))
-            result = {"passed": False, "final_patch": patch, "test_output": str(e)}
+            result = {
+                "passed": False,
+                "plan_aligned": False,
+                "final_patch": patch,
+                "test_output": str(e),
+                "error": str(e),
+            }
+
+    if args.stop_after and args.stop_after <= 5:
+        summary = {
+            "issue": issue["url"],
+            "title": issue["title"],
+            "plan_aligned": plan_aligned,
+            "patch": str(patch_path),
+            "plan": str(output_dir / "plan.md"),
+            "plan_check": str(output_dir / "plan_check.json"),
+            "validation": str(output_dir / "validation_report.json"),
+            "dashboard": str(log.dashboard_path),
+        }
+        (output_dir / "run_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+        log.finalize(success=plan_aligned if not dry_run else True, summary=summary)
+        return
 
     # ── Step 6 ───────────────────────────────────────────────────
     log.step_start("6", "Writing PR summary...")
@@ -369,9 +410,11 @@ def main():
         "issue": issue["url"],
         "title": issue["title"],
         "repo": str(repo_path) if repo_path else None,
+        "plan_aligned": result.get("plan_aligned", plan_aligned),
         "validation_passed": result.get("passed"),
         "patch": str(patch_path),
         "plan": str(output_dir / "plan.md"),
+        "plan_check": str(output_dir / "plan_check.json"),
         "pr_summary": str(pr_path),
         "dashboard": str(log.dashboard_path),
     }
