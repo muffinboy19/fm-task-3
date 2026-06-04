@@ -1,15 +1,16 @@
 {
-  "patch_lines": 14,
-  "patch_chars": 937,
+  "patch_lines": 525,
+  "patch_chars": 14773,
   "ends_with_newline": true,
-  "diff_file_count": 1,
-  "hunk_count": 2,
+  "diff_file_count": 3,
+  "hunk_count": 3,
   "issues": [
     "HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "HUNK_1_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "HUNK_1_1_NEW_COUNT_MISMATCH: header says +11 lines, found 2 on new side (0 '+', 2 ' ')",
-    "GIT_APPLY: error: corrupt patch at line 15"
+    "HUNK_1_0_NEW_COUNT_MISMATCH: header says +27 lines, found 26 on new side (21 '+', 5 ' ')",
+    "SECTION_2_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "SECTION_3_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "GIT_APPLY: error: patch failed: doc.go:1597\nerror: doc.go: patch does not apply\nerror: jsonschema.go: already exists in working directory\nerror: jsonschema_test.go: already exists in working directory"
   ],
-  "git_apply_exit": 128,
-  "git_apply_stderr": "error: corrupt patch at line 15"
+  "git_apply_exit": 1,
+  "git_apply_stderr": "error: patch failed: doc.go:1597\nerror: doc.go: patch does not apply\nerror: jsonschema.go: already exists in working directory\nerror: jsonschema_test.go: already exists in working directory"
 }

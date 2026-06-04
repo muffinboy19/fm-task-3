@@ -15,7 +15,7 @@
       "There",
       "README",
       "jsonschema",
-      "JSON Schema",
+      "json schema",
       "struct tags",
       "go-playground/validator",
       "invopop/jsonschema"
@@ -31,7 +31,7 @@
   },
   "type": "enhancement",
   "open_questions": [
-    "Should JSON Schema generation be implemented in go-playground/validator or handled by external tools such as invopop/jsonschema?"
+    "Should JSON Schema generation be implemented in go-playground/validator or handled by an external tool such as invopop/jsonschema?"
   ],
   "confidence": "medium",
   "source": "llm"

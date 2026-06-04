@@ -1,69 +1,40 @@
 {
-  "aligned": false,
+  "aligned": true,
   "confidence": "high",
   "planned_files": [
-    "jsonschema/go.mod",
-    "jsonschema/reflect.go",
-    "jsonschema/mapping.go",
-    "jsonschema/reflect_test.go",
-    "_examples/jsonschema/main.go",
-    "README.md",
+    "jsonschema.go",
+    "jsonschema_test.go",
     "doc.go"
   ],
   "patch_files": [
-    "README.md"
+    "doc.go",
+    "jsonschema.go",
+    "jsonschema_test.go"
   ],
-  "missing_from_patch": [
-    "jsonschema/go.mod",
-    "jsonschema/reflect.go",
-    "jsonschema/mapping.go",
-    "jsonschema/reflect_test.go",
-    "_examples/jsonschema/main.go",
-    "doc.go"
+  "missing_from_patch": [],
+  "extra_in_patch": [
+    "jsonschema_test.go: TestJSONSchema_invalidInput"
   ],
-  "extra_in_patch": [],
   "deviations": [
-    "No optional jsonschema/ module, go.mod, Reflect API, or invopop/jsonschema integration",
-    "No mapping.go Phase 1 validate-tag to JSON Schema keyword mapping",
-    "No reflect_test.go table-driven tests from the test strategy",
-    "No _examples/jsonschema/main.go runnable example (README link target missing)",
-    "No doc.go cross-link paragraph in root validator package",
-    "README change is only one examples-list bullet, not the planned JSON Schema generation subsection",
-    "Core validator files correctly untouched, but the planned deliverable is almost entirely absent"
+    "Tests use one t.Run subtest per function instead of table-driven case slices described in the plan",
+    "Adds unplanned TestJSONSchema_invalidInput for non-struct input",
+    "Doc example uses validate hostname tag which is not mapped to schema keywords (example still demonstrates the API)"
   ],
-  "summary": "The patch is documentation-only (a single README examples link) and does not implement the planned optional jsonschema module, API, mapping, tests, example, or doc.go cross-link.",
+  "summary": "The patch implements the planned JSONSchema API, cTag-based mapping, property-name resolution, documentation, and all nine specified tests in the intended files with only minor extras.",
   "heuristic": {
     "planned_files_heuristic": [
-      "_examples/jsonschema/main.go",
-      "baked_in.go",
-      "cache.go",
       "doc.go",
-      "jsonschema/mapping.go",
-      "jsonschema/reflect.go",
-      "jsonschema/reflect_test.go",
-      "non-standard/validators/notblank_test.go",
-      "validator_instance.go",
-      "validator_test.go"
+      "jsonschema.go",
+      "jsonschema_test.go"
     ],
     "patch_files": [
-      "README.md"
-    ],
-    "missing_from_patch_heuristic": [
-      "_examples/jsonschema/main.go",
-      "baked_in.go",
-      "cache.go",
       "doc.go",
-      "jsonschema/mapping.go",
-      "jsonschema/reflect.go",
-      "jsonschema/reflect_test.go",
-      "non-standard/validators/notblank_test.go",
-      "validator_instance.go",
-      "validator_test.go"
+      "jsonschema.go",
+      "jsonschema_test.go"
     ],
-    "extra_in_patch_heuristic": [
-      "README.md"
-    ]
+    "missing_from_patch_heuristic": [],
+    "extra_in_patch_heuristic": []
   },
   "check_type": "plan_adherence",
-  "overall_passed": false
+  "overall_passed": true
 }

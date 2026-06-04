@@ -96,3 +96,6 @@ error: jsonschema_test.go: already exists in working directory
 2026-06-04 17:45:48,489 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/validator
 2026-06-04 17:45:58,217 | INFO     | LLM `pr_writer` · `cursor/composer-2.5` (9.7s) · 2250 chars
 2026-06-04 17:45:58,217 | DEBUG    | --- pr_writer — response ---
+2026-06-04 17:45:58,226 | INFO     | Dashboard  : /Users/gaurav/Desktop/alaph/logs/dashboard.md
+2026-06-04 17:45:58,226 | INFO     | Run report : /Users/gaurav/Desktop/alaph/logs/run_report.md
+2026-06-04 17:45:58,226 | INFO     | Live UI    : http://127.0.0.1:8765/
