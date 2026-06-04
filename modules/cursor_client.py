@@ -10,7 +10,8 @@ from typing import Optional
 from cursor_sdk import Agent, AgentOptions, LocalAgentOptions
 
 from modules.agent_logger import get_logger
-from modules.config import get, get_cursor_api_key, PROJECT_ROOT
+from modules.config import get, get_cursor_api_key
+from modules.repo_resolver import effective_repo_path
 
 
 class CursorLLMClient:
@@ -23,12 +24,7 @@ class CursorLLMClient:
             )
         os.environ["CURSOR_API_KEY"] = self.api_key
         self.model = get("CURSOR_MODEL", "composer-2.5")
-        repo = get("GITHUB_REPO_PATH", "./gin")
-        self.repo_cwd = str(
-            Path(repo).resolve()
-            if Path(repo).is_absolute()
-            else (PROJECT_ROOT / repo).resolve()
-        )
+        self.repo_cwd = str(effective_repo_path())
 
     def complete(
         self,

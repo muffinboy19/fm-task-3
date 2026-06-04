@@ -3,14 +3,16 @@
   "go_binary": "/opt/homebrew/bin/go",
   "patch_has_tests": true,
   "files_changed": [
-    "render/json.go",
-    "render/render_test.go"
+    "README.md",
+    "_examples/jsonschema/main.go",
+    "non-standard/jsonschema/jsonschema.go",
+    "non-standard/jsonschema/jsonschema_test.go",
+    "non-standard/jsonschema/reflect.go",
+    "non-standard/jsonschema/tags.go"
   ],
-  "packages_tested": [
-    "./render"
-  ],
-  "apply_passed": true,
-  "tests_passed": true,
-  "overall_passed": true,
-  "test_output_preview": "=== go test ./render (exit 0) ===\nok  \tgithub.com/gin-gonic/gin/render\t0.311s"
+  "packages_tested": [],
+  "apply_passed": false,
+  "tests_passed": false,
+  "overall_passed": false,
+  "test_output_preview": "git apply --check failed:\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory\n\n"
 }

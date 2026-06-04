@@ -64,7 +64,7 @@ Open `.env` and fill in these two values (same names as in `.env.example`):
 | `CURSOR_API_KEY` | Your Cursor API key (from the Cursor dashboard in your browser) |
 | `GITHUB_ISSUE_URL` | The GitHub issue to fix, e.g. `https://github.com/gin-gonic/gin/issues/1234` |
 
-Leave `LLM_PROVIDER=cursor` as in `.env.example`. The repo clones automatically into `test_repo/` — nothing else required.
+Leave `LLM_PROVIDER=cursor` as in `.env.example`. The target repo is derived from `GITHUB_ISSUE_URL`, cloned into `test_repo/<repo>/`, and recorded in `output/repo.json` — no `GITHUB_REPO_PATH` in `.env`.
 
 **Step 4 — Run**
 

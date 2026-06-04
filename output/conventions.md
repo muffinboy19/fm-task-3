@@ -18,9 +18,3 @@ Implementation
 - Match literal formats already in tests (escape style, content types, JSON shape).
 
 If context shows example functions or tests, treat them as the source of truth for style.
-
-
-### Detected in this repo
-
-- Tests: uses testify assert/require
-- Receivers: short single-letter names

@@ -1,19 +1,18 @@
 {
-  "patch_lines": 81,
-  "patch_chars": 2073,
+  "patch_lines": 918,
+  "patch_chars": 22687,
   "ends_with_newline": true,
-  "diff_file_count": 2,
-  "hunk_count": 5,
+  "diff_file_count": 6,
+  "hunk_count": 6,
   "issues": [
-    "HUNK_1_0_OLD_COUNT_MISMATCH: header says -9 lines, found 1 '-' lines",
-    "HUNK_1_0_NEW_COUNT_MISMATCH: header says +34 lines, found 33 on new side (27 '+', 6 ' ')",
-    "HUNK_1_1_OLD_COUNT_MISMATCH: header says -7 lines, found 1 '-' lines",
-    "HUNK_1_1_NEW_COUNT_MISMATCH: header says +7 lines, found 6 on new side (1 '+', 5 ' ')",
-    "HUNK_2_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "HUNK_2_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "HUNK_2_2_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
-    "GIT_APPLY: error: corrupt patch at line 40"
+    "HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines",
+    "SECTION_2_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "SECTION_3_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "SECTION_4_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "SECTION_5_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "SECTION_6_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: +})",
+    "GIT_APPLY: error: patch failed: README.md:68\nerror: README.md: patch does not apply\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory"
   ],
-  "git_apply_exit": 128,
-  "git_apply_stderr": "error: corrupt patch at line 40"
+  "git_apply_exit": 1,
+  "git_apply_stderr": "error: patch failed: README.md:68\nerror: README.md: patch does not apply\nerror: _examples/jsonschema/main.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema.go: already exists in working directory\nerror: non-standard/jsonschema/jsonschema_test.go: already exists in working directory\nerror: non-standard/jsonschema/reflect.go: already exists in working directory\nerror: non-standard/jsonschema/tags.go: already exists in working directory"
 }

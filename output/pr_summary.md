@@ -1,23 +1,35 @@
-# Fix AsciiJSON non-BMP escaping with UTF-16 surrogate pairs
+# Add opt-in JSON Schema generation from validate tags
 
 ## Summary
 
-`render.AsciiJSON` escaped every non-ASCII rune with `\u%04x`, but `%04x` only sets a minimum width. Supplementary-plane code points (e.g. emoji) produced 5+ hex digits in a single `\u` token, which is invalid per RFC 8259 and silently corrupts the decoded string while still producing syntactically valid JSON. This PR branches on BMP vs non-BMP runes: BMP characters keep the existing single `\uXXXX` escape, and supplementary characters are encoded as a UTF-16 surrogate pair via `unicode/utf16.EncodeRune`.
+Issue [#1518](https://github.com/go-playground/validator/issues/1518) requests JSON Schema generation from struct tags so callers can document or validate complex configuration files alongside runtime validation. The core `validator` package has no introspection API for this today—tag parsing lives in unexported cache logic—and maintainers have indicated this should not ship in core.
+
+This PR adds an opt-in `non-standard/jsonschema` subpackage (same pattern as `non-standard/validators`) that walks structs via reflection and maps common `validate` tags to JSON Schema constraints. It does not change core validation behavior.
 
 ## Changes
 
-- Import `unicode/utf16` in `render/json.go` and emit two `\u%04x` escapes for runes above U+FFFF
-- Keep single `\u%04x` escaping for BMP runes (U+0080–U+FFFF); existing behavior for `GO语言`, `<br>`, etc. is unchanged
-- Increase `escapeBuf` preallocation from 6 to 12 bytes to cover two escape sequences per rune
-- Add `nonBMP` subtest to `TestRenderAsciiJSON` asserting wire format `{"msg":"\ud83d\ude00"}` and round-trip via `json.Unmarshal`
-- Add `supplementaryBoundary` subtest for U+10000 (`\ud800\udc00`) with round-trip assertion
+- Add `non-standard/jsonschema` with `Generate` and `GenerateSchema` entry points, plus functional options: `WithJSONTag` / `WithoutJSONTag`, `WithTagName`, `WithRequiredStructEnabled`, and `WithDraft` (default Draft 2020-12).
+- Implement a read-only reflection walker that maps Go types to JSON Schema (`string`, `integer`, `number`, `boolean`, `object`, `array`), handles `dive` for nested structs/slices/maps, and sets `nullable` on optional pointer fields.
+- Map common `validate` tags to schema keywords: `required`, `omitempty`/`omitnil`/`omitzero`, `min`/`max`/`len`/`eq`, `gt`/`gte`/`lt`/`lte`, `oneof` → `enum`, format tags (`email`, `url`, `uri`, `uuid`, `uuid4`, `ipv4`, `ipv6`), `unique` → `uniqueItems`, and `boolean` type override.
+- Skip unexported fields and `validate:"-"`; use `json` tag names for property keys by default; support embedded struct field promotion.
+- Ignore cross-field and unknown validation tags in v1 (e.g. `required_without`); map keys are not validated in schema (documented limitation).
+- Add `_examples/jsonschema/main.go` demonstrating config schema generation.
+- Link the example and package from `README.md`.
 
 ## Test plan
 
-- [x] `go test ./render/...` — pass (`ok github.com/gin-gonic/gin/render 0.311s`)
-- [x] `TestRenderAsciiJSON` — existing BMP cases unchanged; new `nonBMP` and `supplementaryBoundary` subtests cover emoji and first supplementary code point
-- [x] `TestRenderAsciiJSONFail` — unchanged (marshal error path)
+- [x] `go test ./non-standard/jsonschema/... -v` — all 12 tests pass:
+  - Simple struct: `required`, `email` format, numeric `gte`/`lte`
+  - JSON tag property naming (`e-mail`)
+  - Skip `validate:"-"` fields
+  - `omitempty` omitted from `required`
+  - Nested struct, slice, and map `dive`
+  - `oneof` → `enum`
+  - Optional pointer → `nullable`
+  - Cross-field tags ignored without error
+  - Non-struct input returns error
+  - `GenerateSchema` sets `$schema` draft URI
 
 ## Closes
 
-https://github.com/gin-gonic/gin/issues/4688
+https://github.com/go-playground/validator/issues/1518

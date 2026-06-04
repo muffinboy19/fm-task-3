@@ -20,7 +20,8 @@ from modules.validator import Validator
 from modules.pr_writer import PRWriter
 from modules.convention import format_conventions_block, load_conventions_prompt
 from modules.issue_guardrails import load_candidates, pick_next_candidate
-from modules.repo_resolver import resolve_repo_path
+from modules.live_state import clear_stale_run_outputs
+from modules.repo_resolver import resolve_repo_path, save_repo_manifest
 
 
 def parse_args():
@@ -124,8 +125,7 @@ def main():
         return
 
     issue_url = args.issue or get("GITHUB_ISSUE_URL")
-    explicit_repo = args.repo or get("GITHUB_REPO_PATH") or None
-    # CLI flags override .env so LLM cwd and config stay aligned with --repo
+    explicit_repo = args.repo or None
     if args.issue:
         os.environ["GITHUB_ISSUE_URL"] = args.issue
     output_dir = Path(args.output or get("OUTPUT_DIR", "./output")).resolve()
@@ -133,6 +133,9 @@ def main():
     api_key = args.api_key or None
     github_token = args.github_token or get("GITHUB_TOKEN") or None
     dry_run = args.dry_run or _env_bool("DRY_RUN")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    clear_stale_run_outputs(output_dir)
 
     log = init_logger(log_dir, output_dir=output_dir)
 
@@ -171,15 +174,14 @@ def main():
     if needs_repo:
         try:
             repo_path = resolve_repo_path(issue_url, explicit=explicit_repo, log=log)
+            manifest_path = save_repo_manifest(output_dir, issue_url, repo_path)
         except Exception as e:
             log.error(f"Failed to resolve/clone repo: {e}")
             sys.exit(1)
-        os.environ["GITHUB_REPO_PATH"] = str(repo_path)
         log.kv("Repo path", str(repo_path))
+        log.artifact("Repo manifest", str(manifest_path))
     else:
         repo_path = None
-
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     if (
         repo_path
@@ -366,6 +368,7 @@ def main():
     summary = {
         "issue": issue["url"],
         "title": issue["title"],
+        "repo": str(repo_path) if repo_path else None,
         "validation_passed": result.get("passed"),
         "patch": str(patch_path),
         "plan": str(output_dir / "plan.md"),

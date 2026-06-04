@@ -81,12 +81,12 @@ function applyPayload(data) {
   renderArtifacts(data.artifacts);
 
   const f = data.files || {};
-  renderIssue(f);
-  renderContext(f);
-  renderPlan(f.plan_md);
-  renderPr(f.pr_summary_md);
-  renderDiff(f.patch_files, f.patch_stats, f.patch_raw);
-  renderValidation(f);
+  renderIssue(f, data.steps);
+  renderContext(f, data.steps);
+  renderPlan(f.plan_md, data.steps);
+  renderPr(f.pr_summary_md, data.steps);
+  renderDiff(f.patch_files, f.patch_stats, f.patch_raw, data.steps);
+  renderValidation(f, data.steps);
 
   updateLogTail(data.log_tail);
 }
@@ -136,7 +136,13 @@ function kvTable(obj, keys) {
     : '<p class="empty">Not available yet</p>';
 }
 
-function renderIssue(files) {
+function renderIssue(files, steps) {
+  const st = stepStatus(steps, "1");
+  if (st === "running") {
+    $("#tab-issue").innerHTML =
+      '<p class="empty">Loading issue…</p>';
+    return;
+  }
   const u = files.issue_understanding;
   const raw = files.issue_raw;
   const html = [];
@@ -177,23 +183,51 @@ function renderIssue(files) {
     html.join("") || '<p class="empty">Run step 1 to load issue data</p>';
 }
 
-function renderContext(files) {
+function renderContext(files, steps) {
+  const st = stepStatus(steps, "2");
+  if (st === "running") {
+    $("#tab-context").innerHTML =
+      '<p class="empty">Building context…</p>';
+    return;
+  }
   const ctx = files.context;
   $("#tab-context").innerHTML = ctx
     ? `<pre class="json-block">${esc(JSON.stringify(ctx, null, 2))}</pre>`
     : '<p class="empty">Run step 2 to load context</p>';
 }
 
-function renderPlan(planMd) {
-  $("#plan-body").textContent = planMd || "(Plan not generated yet — step 3)";
+function stepStatus(steps, id) {
+  const s = (steps || []).find((x) => String(x.id) === String(id));
+  return s?.status || "pending";
 }
 
-function renderPr(prMd) {
-  $("#pr-body").textContent = prMd || "(PR summary not generated yet — step 6)";
+function renderPlan(planMd, steps) {
+  const st = stepStatus(steps, "3");
+  let text = "";
+  if (st === "running") text = "Generating plan…";
+  else if (planMd?.trim()) text = planMd;
+  else text = "Plan not generated yet — step 3";
+  $("#plan-body").textContent = text;
 }
 
-function renderDiff(patchFiles, stats, raw) {
+function renderPr(prMd, steps) {
+  const st = stepStatus(steps, "6");
+  let text = "";
+  if (st === "running") text = "Writing PR summary…";
+  else if (prMd?.trim()) text = prMd;
+  else text = "PR summary not generated yet — step 6";
+  $("#pr-body").textContent = text;
+}
+
+function renderDiff(patchFiles, stats, raw, steps) {
   const statsEl = $("#patch-stats");
+  const st = stepStatus(steps, "4");
+  if (st === "running") {
+    statsEl.innerHTML = "";
+    $("#diff-viewer").innerHTML =
+      '<p class="empty">Generating patch…</p>';
+    return;
+  }
   if (!stats?.file_count) {
     statsEl.innerHTML = "";
     $("#diff-viewer").innerHTML =
@@ -241,7 +275,13 @@ function renderDiff(patchFiles, stats, raw) {
     .join("");
 }
 
-function renderValidation(files) {
+function renderValidation(files, steps) {
+  const st = stepStatus(steps, "5");
+  if (st === "running") {
+    $("#tab-validation").innerHTML =
+      '<p class="empty">Running validation…</p>';
+    return;
+  }
   const v = files.validation;
   const rs = files.run_summary;
   let html = "";

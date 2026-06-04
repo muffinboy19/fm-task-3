@@ -1,34 +1,18 @@
 {
-  "anchor_paths_used": [
-    "render/json.go"
-  ],
+  "anchor_paths_used": [],
   "grep_terms_used": [
-    "AsciiJSON.Render",
-    "render.AsciiJSON",
-    "c.AsciiJSON(...)",
-    "unicode.MaxASCII",
-    "AsciiJSON",
-    "Body.String",
-    "json.Unmarshal",
-    "bytesconv.BytesToString(ret)",
-    "fmt",
-    "%04x"
+    "There",
+    "Schema",
+    "README",
+    "Feature",
+    "Generate",
+    "acrazing",
+    "Personally",
+    "jsonschema",
+    "invopop/jsonschema"
   ],
-  "candidate_files": [
-    "render/json.go",
-    "render/render.go",
-    "render/redirect.go",
-    "render/text.go",
-    "render/render_test.go"
-  ],
-  "candidate_function_names": [
-    "Render",
-    "TestRenderAsciiJSON",
-    "TestRenderAsciiJSONFail",
-    "WriteContentType",
-    "Render",
-    "WriteString"
-  ],
-  "convention_snapshot": "- Tests: uses testify assert/require\n- Receivers: short single-letter names",
+  "candidate_files": [],
+  "candidate_function_names": [],
+  "convention_snapshot": "Standard Go conventions",
   "conventions_file": "/Users/gaurav/Desktop/alaph/output/conventions.md"
 }

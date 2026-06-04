@@ -74,6 +74,46 @@ def parse_unified_diff(patch: str) -> list[dict]:
     return files
 
 
+# Output files from a prior run (cleared at start; repo.json is kept)
+_STALE_RUN_FILES = (
+    "plan.md",
+    "fix.patch",
+    "pr_summary.md",
+    "validation_report.json",
+    "context.json",
+    "conventions.md",
+    "conventions_prompt.txt",
+    "issue_raw.json",
+    "issue_understanding.json",
+    "run_summary.json",
+    "code_generator_raw.txt",
+    "code_generator_diagnosis.json",
+    "code_generator_retry_raw.txt",
+    "code_generator_retry_diagnosis.json",
+)
+
+
+def clear_stale_run_outputs(output_dir: Path) -> None:
+    """Remove artifacts from previous runs so the dashboard starts empty."""
+    output_dir = Path(output_dir)
+    for name in _STALE_RUN_FILES:
+        path = output_dir / name
+        if path.is_file():
+            path.unlink(missing_ok=True)
+
+
+def _step_status(steps: list, step_id: str) -> str:
+    for s in steps or []:
+        if str(s.get("id")) == step_id:
+            return (s.get("status") or "pending").lower()
+    return "pending"
+
+
+def _step_has_output(steps: list, step_id: str) -> bool:
+    """Expose file content only after a step finished (ok or fail)."""
+    return _step_status(steps, step_id) in ("ok", "fail")
+
+
 def patch_stats(patch: str) -> dict:
     lines = patch.splitlines()
     files = [ln for ln in lines if ln.startswith("diff --git")]
@@ -110,22 +150,54 @@ def build_live_payload(
         except OSError:
             pass
 
-    patch = _read_text(output_dir / "fix.patch")
-    plan = _read_text(output_dir / "plan.md", max_chars=120_000)
-    pr = _read_text(output_dir / "pr_summary.md", max_chars=80_000)
-
-    validation = _read_json(output_dir / "validation_report.json")
-
-    elapsed = logger_snapshot.get("elapsed_sec", 0)
     steps = logger_snapshot.get("steps", [])
     any_running = any(s.get("status") == "running" for s in steps)
+
+    issue_raw = (
+        _read_json(output_dir / "issue_raw.json")
+        if _step_has_output(steps, "1")
+        else None
+    )
+    issue_understanding = (
+        _read_json(output_dir / "issue_understanding.json")
+        if _step_has_output(steps, "1")
+        else None
+    )
+    context = (
+        _read_json(output_dir / "context.json")
+        if _step_has_output(steps, "2")
+        else None
+    )
+    plan = (
+        _read_text(output_dir / "plan.md", max_chars=120_000)
+        if _step_has_output(steps, "3")
+        else ""
+    )
+    patch = _read_text(output_dir / "fix.patch") if _step_has_output(steps, "4") else ""
+    validation = (
+        _read_json(output_dir / "validation_report.json")
+        if _step_has_output(steps, "5")
+        else None
+    )
+    pr = (
+        _read_text(output_dir / "pr_summary.md", max_chars=80_000)
+        if _step_has_output(steps, "6")
+        else ""
+    )
+    run_summary = (
+        _read_json(output_dir / "run_summary.json")
+        if logger_snapshot.get("success") is not None
+        else None
+    )
+
+    elapsed = logger_snapshot.get("elapsed_sec", 0)
 
     return {
         "updated_at": datetime.now().isoformat(),
         "elapsed_sec": elapsed,
         "any_running": any_running,
         "success": logger_snapshot.get("success"),
-        "steps": logger_snapshot.get("steps", []),
+        "steps": steps,
         "events": logger_snapshot.get("events", []),
         "artifacts": logger_snapshot.get("artifacts", []),
         "log_path": str(latest_log) if latest_log.is_file() else "",
@@ -133,10 +205,10 @@ def build_live_payload(
         "output_dir": str(output_dir.resolve()),
         "log_dir": str(log_dir.resolve()),
         "files": {
-            "run_summary": _read_json(output_dir / "run_summary.json"),
-            "issue_raw": _read_json(output_dir / "issue_raw.json"),
-            "issue_understanding": _read_json(output_dir / "issue_understanding.json"),
-            "context": _read_json(output_dir / "context.json"),
+            "run_summary": run_summary,
+            "issue_raw": issue_raw,
+            "issue_understanding": issue_understanding,
+            "context": context,
             "validation": validation,
             "plan_md": plan,
             "pr_summary_md": pr,

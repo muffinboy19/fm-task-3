@@ -12,7 +12,7 @@ from typing import Optional
 from modules.llm import LLMClient, load_prompt, extract_fence
 from modules.patch_utils import analyze_patch
 from modules.agent_logger import get_logger
-from modules.config import PROJECT_ROOT, get
+from modules.repo_resolver import default_output_dir, effective_repo_path
 from modules.convention import format_conventions_block
 
 
@@ -24,9 +24,7 @@ class CodeGenerator:
         self.repo_path = repo_path or self._resolve_repo()
 
     def _resolve_repo(self) -> Path:
-        repo = get("GITHUB_REPO_PATH", "./test_repo")
-        p = Path(repo)
-        return p.resolve() if p.is_absolute() else (PROJECT_ROOT / p).resolve()
+        return effective_repo_path()
 
     def generate(self, issue: dict, context: dict, plan: str) -> str:
         return self._generate_patch(issue, context, plan, module="code_generator")
@@ -79,7 +77,7 @@ Output ONLY the corrected unified diff.
             system=system, user=user, max_tokens=self.MAX_TOKENS, module=module
         )
 
-        out_dir = PROJECT_ROOT / get("OUTPUT_DIR", "./output")
+        out_dir = default_output_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
         raw_path = out_dir / f"{module}_raw.txt"
         raw_path.write_text(raw, encoding="utf-8")

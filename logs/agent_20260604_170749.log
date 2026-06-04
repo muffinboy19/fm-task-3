@@ -1,0 +1,102 @@
+2026-06-04 17:07:49,986 | INFO     | [?] Open Source Issue Solver started
+2026-06-04 17:07:49,986 | INFO     | **Issue URL:** https://github.com/gin-gonic/gin/issues/4688
+2026-06-04 17:07:49,990 | INFO     | **Output dir:** /Users/gaurav/Desktop/alaph/output
+2026-06-04 17:07:49,990 | INFO     | **LLM provider:** cursor
+2026-06-04 17:07:49,990 | INFO     | **Dry run:** False
+2026-06-04 17:07:49,990 | WARNING  | Repo path not found (/Users/gaurav/Desktop/alaph/gin); cloning from issue URL
+2026-06-04 17:07:49,990 | INFO     | Cloning https://github.com/gin-gonic/gin.git -> /Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:07:51,361 | INFO     | **Cloned repo:** /Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:07:51,361 | INFO     | **Repo path:** /Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:07:51,362 | INFO     | Resetting repository (git checkout + clean)...
+2026-06-04 17:07:51,401 | INFO     | **Repo clean after reset:** True
+2026-06-04 17:07:51,403 | INFO     | Phase 1a: extracting raw issue from GitHub...
+2026-06-04 17:07:51,403 | DEBUG    | Extracting issue URL: https://github.com/gin-gonic/gin/issues/4688
+2026-06-04 17:07:51,403 | INFO     | Fetching issue gin-gonic/gin#4688
+2026-06-04 17:07:51,403 | DEBUG    | GitHub API GET: https://api.github.com/repos/gin-gonic/gin/issues/4688
+2026-06-04 17:07:51,944 | DEBUG    | GitHub API GET: https://api.github.com/repos/gin-gonic/gin/issues/4688/comments
+2026-06-04 17:07:52,391 | INFO     | Fetched issue + 2 comment(s)
+2026-06-04 17:07:52,393 | INFO     | **Title:** AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes
+2026-06-04 17:07:52,393 | INFO     | **Labels:** []
+2026-06-04 17:07:52,393 | INFO     | **Identifiers:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel']
+2026-06-04 17:07:52,393 | INFO     | **Paths:** []
+2026-06-04 17:07:52,393 | INFO     | **Error strings:** []
+2026-06-04 17:07:52,393 | INFO     | **Linked issues:** ['gin-gonic/gin#2546']
+2026-06-04 17:07:52,393 | INFO     | **Search terms:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel', 'render.AsciiJSON', 'fmt.Appendf(buf, "\\\\u%04x", r)', '%04x', '\\uXXXXX', '\\u', '\\ud83d\\ude00', '😀', '{"msg":"\\u1f600"}', 'json.Unmarshal', 'ὠ0', 'ὠ', '0', 'render/json.go', '(master, commit', '(or', '### Go Version', '### Operating System', '**Output:**']
+2026-06-04 17:07:52,393 | DEBUG    | --- Issue body ---
+2026-06-04 17:07:52,393 | INFO     | Phase 1b: structured intake (understanding engine)...
+2026-06-04 17:07:52,457 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:08:06,379 | INFO     | LLM `issue_understanding` · `cursor/composer-2.5` (13.9s) · 2440 chars
+2026-06-04 17:08:06,379 | DEBUG    | --- issue_understanding — response ---
+2026-06-04 17:08:06,379 | INFO     | Structured intake completed (LLM)
+2026-06-04 17:08:06,380 | INFO     | **Intake source:** llm
+2026-06-04 17:08:06,380 | INFO     | **Type:** bug
+2026-06-04 17:08:06,380 | INFO     | **Confidence:** high
+2026-06-04 17:08:06,380 | INFO     | **Symptom:** AsciiJSON silently corrupts non-BMP characters (emoji) by emitting malformed \u escapes.
+2026-06-04 17:08:06,380 | INFO     | **Expected:** Per RFC 8259 §7, code points outside the BMP must be encoded as a UTF-16 surroga
+2026-06-04 17:08:06,380 | INFO     | **Actual:** `render.AsciiJSON` writes malformed `\uXXXXX` escapes (5+ hex digits); output is
+2026-06-04 17:08:06,380 | INFO     | **Open questions:** []
+2026-06-04 17:08:06,380 | INFO     | **Anchor identifiers:** ['AsciiJSON', 'BMP', 'Description', 'Unicode', 'FFFF', 'ASCII', 'Appendf', 'Per', 'RFC', 'UTF', 'Example', 'Input', 'After', 'Unmarshal', 'Expected', 'Offending', 'AsciiJSON.Render', 'BytesToString', 'MaxASCII', 'Write', 'WriteByte', 'Related', 'Gin', 'Version', 'Can', 'Yes', 'Steps', 'Render', 'Observe', 'Source', 'Code', 'Minimal', 'NewRecorder', 'Data', 'Body.String', 'Println', 'Printf', 'Operating', 'System', 'Linux', 'Thank', 'CJK', 'Extension', 'Test', 'Results', 'FE0F', 'Original', 'Rendered', 'Decoded', 'Round', 'Output', 'Non', 'Character', 'Corruption', 'Issue', 'Confirmed', 'Scenario', 'Result', 'Working', 'Corrupted', 'PR', 'Thanks', 'Feel', 'unicode.MaxASCII', 'bytesconv', 'escapeBuf', 'buffer', 'json', 'httptest', 'c.AsciiJSON', 'render', 'UTF-16', 'surrogate', 'RFC 8259', 'bytesconv.BytesToString']
+2026-06-04 17:08:06,380 | INFO     | **Anchor paths:** ['render/json.go']
+2026-06-04 17:08:06,380 | DEBUG    | --- Repro (intake) ---
+2026-06-04 17:08:06,383 | INFO     | **Curated grep terms:** ['c.AsciiJSON', 'AsciiJSON.Render', 'unicode.MaxASCII', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'AsciiJSON', 'v1.12.0', 'go1.25.0', 'Body.String', 'json.Unmarshal']
+2026-06-04 17:08:06,415 | INFO     | Repo path: /Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:08:06,415 | INFO     | **code-review-graph available:** False
+2026-06-04 17:08:06,415 | INFO     | **Anchor paths:** ['render/json.go']
+2026-06-04 17:08:06,415 | INFO     | **Curated grep terms:** ['c.AsciiJSON', 'AsciiJSON.Render', 'unicode.MaxASCII', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'AsciiJSON', 'v1.12.0', 'go1.25.0', 'Body.String', 'json.Unmarshal']
+2026-06-04 17:08:06,415 | INFO     | **Error strings:** []
+2026-06-04 17:08:06,415 | DEBUG    |   path anchor: render/json.go
+2026-06-04 17:08:06,415 | DEBUG    | grep term: 'c.AsciiJSON' in 1 dir(s)
+2026-06-04 17:08:06,424 | DEBUG    | grep term: 'AsciiJSON.Render' in 1 dir(s)
+2026-06-04 17:08:06,430 | DEBUG    | grep term: 'unicode.MaxASCII' in 1 dir(s)
+2026-06-04 17:08:06,435 | DEBUG    | grep term: 'render.AsciiJSON' in 1 dir(s)
+2026-06-04 17:08:06,439 | DEBUG    | grep term: 'c.AsciiJSON(...)' in 1 dir(s)
+2026-06-04 17:08:06,442 | DEBUG    | grep term: 'AsciiJSON' in 1 dir(s)
+2026-06-04 17:08:06,445 | DEBUG    | grep term: 'v1.12.0' in 1 dir(s)
+2026-06-04 17:08:06,448 | DEBUG    | grep term: 'go1.25.0' in 1 dir(s)
+2026-06-04 17:08:06,450 | DEBUG    | grep term: 'Body.String' in 1 dir(s)
+2026-06-04 17:08:06,453 | DEBUG    | grep term: 'json.Unmarshal' in 1 dir(s)
+2026-06-04 17:08:06,456 | INFO     | Located 3 candidate file(s)
+2026-06-04 17:08:06,456 | DEBUG    |   file: render/json.go
+2026-06-04 17:08:06,456 | DEBUG    |   file: render/render.go
+2026-06-04 17:08:06,456 | DEBUG    |   file: render/render_test.go
+2026-06-04 17:08:06,495 | INFO     | Extracted 6 candidate function(s)
+2026-06-04 17:08:06,495 | DEBUG    |   TestRenderAsciiJSON in render/render_test.go (lines 243-262, score=4)
+2026-06-04 17:08:06,495 | DEBUG    |   TestRenderAsciiJSONFail in render/render_test.go (lines 264-270, score=3)
+2026-06-04 17:08:06,495 | DEBUG    |   Render in render/json.go (lines 155-176, score=2)
+2026-06-04 17:08:06,495 | DEBUG    |   WriteContentType in render/json.go (lines 179-181, score=1)
+2026-06-04 17:08:06,495 | DEBUG    |   TestRenderJSON in render/render_test.go (lines 26-41, score=1)
+2026-06-04 17:08:06,495 | DEBUG    |   TestRenderIndentedJSON in render/render_test.go (lines 51-63, score=1)
+2026-06-04 17:08:06,495 | DEBUG    | --- Convention snapshot ---
+2026-06-04 17:08:06,495 | DEBUG    | --- Assembled LLM context ---
+2026-06-04 17:08:06,498 | INFO     | **Anchor paths:** ['render/json.go']
+2026-06-04 17:08:06,498 | INFO     | **Grep terms:** ['c.AsciiJSON', 'AsciiJSON.Render', 'unicode.MaxASCII', 'render.AsciiJSON', 'c.AsciiJSON(...)', 'AsciiJSON', 'v1.12.0', 'go1.25.0', 'Body.String', 'json.Unmarshal']
+2026-06-04 17:08:06,498 | INFO     | **Files in scope:** render/json.go, render/render.go, render/render_test.go
+2026-06-04 17:08:06,502 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:08:27,799 | INFO     | LLM `code_reasoning` · `cursor/composer-2.5` (21.3s) · 4086 chars
+2026-06-04 17:08:27,800 | DEBUG    | --- code_reasoning — response ---
+2026-06-04 17:08:27,808 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:09:21,016 | INFO     | LLM `code_generator` · `cursor/composer-2.5` (53.2s) · 2398 chars
+2026-06-04 17:09:21,016 | DEBUG    | --- code_generator — response ---
+2026-06-04 17:09:21,017 | INFO     | Raw LLM response saved (2398 chars) → /Users/gaurav/Desktop/alaph/output/code_generator_raw.txt
+2026-06-04 17:09:21,043 | INFO     | Patch stats: 79 lines, 2382 chars
+2026-06-04 17:09:21,043 | INFO     | Hunks: 4, files: 2
+2026-06-04 17:09:21,043 | WARNING  | Patch diagnosis: ["HUNK_1_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines", "HUNK_1_1_OLD_COUNT_MISMATCH: header says -11 lines, found 2 '-' lines", "HUNK_1_1_NEW_COUNT_MISMATCH: header says +16 lines, found 15 on new side (7 '+', 8 ' ')", "HUNK_2_0_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines", "HUNK_2_0_NEW_COUNT_MISMATCH: header says +7 lines, found 6 on new side (1 '+', 5 ' ')", "HUNK_2_1_OLD_COUNT_MISMATCH: header says -6 lines, found 0 '-' lines"]
+2026-06-04 17:09:21,053 | INFO     | **Patch includes *_test.go changes:** True
+2026-06-04 17:09:21,053 | INFO     | Validation attempt 1/3
+2026-06-04 17:09:21,053 | DEBUG    | Running git apply --check
+2026-06-04 17:09:21,112 | INFO     | Patch applied successfully
+2026-06-04 17:09:21,112 | INFO     | Running tests for packages: ['./render']
+2026-06-04 17:09:21,112 | INFO     |   go test ./render
+2026-06-04 17:09:22,560 | DEBUG    | --- Test output (attempt 1) ---
+2026-06-04 17:09:22,560 | INFO     | Tests PASSED — fix verified
+2026-06-04 17:09:22,561 | INFO     | Validation report → /Users/gaurav/Desktop/alaph/output/validation_report.json
+2026-06-04 17:09:22,561 | INFO     | **git apply:** OK
+2026-06-04 17:09:22,561 | INFO     | **has tests:** True
+2026-06-04 17:09:22,561 | INFO     | **go test:** PASS
+2026-06-04 17:09:22,561 | DEBUG    | --- Test output ---
+2026-06-04 17:09:22,564 | INFO     | Cursor API model=composer-2.5 cwd=/Users/gaurav/Desktop/alaph/test_repo/gin
+2026-06-04 17:09:28,609 | INFO     | LLM `pr_writer` · `cursor/composer-2.5` (6.0s) · 1428 chars
+2026-06-04 17:09:28,609 | DEBUG    | --- pr_writer — response ---
+2026-06-04 17:09:28,617 | INFO     | Dashboard  : /Users/gaurav/Desktop/alaph/logs/dashboard.md
+2026-06-04 17:09:28,617 | INFO     | Run report : /Users/gaurav/Desktop/alaph/logs/run_report.md
+2026-06-04 17:09:28,617 | INFO     | Live UI    : http://127.0.0.1:8765/
