@@ -9,7 +9,7 @@ import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
 
 from modules.agent_logger import get_logger
-from modules.config import get, get_gemini_api_keys
+from modules.config import get_env, get_gemini_api_keys
 
 _MODEL_FALLBACKS = [
     "gemini-2.5-flash",
@@ -28,7 +28,7 @@ class GeminiLLMClient:
             raise ValueError(
                 "Gemini API key required. Set GEMINI_API_KEY in .env."
             )
-        self.model_name = get("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = get_env("GEMINI_MODEL", "gemini-2.5-flash")
         self._key_cursor = 0
 
     def _mask_key(self, api_key: str) -> str:

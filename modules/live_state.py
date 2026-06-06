@@ -175,19 +175,19 @@ def build_live_payload(
         else ""
     )
     patch = _read_text(output_dir / "fix.patch") if _step_has_output(steps, "4") else ""
-    validation = (
-        _read_json(output_dir / "validation_report.json")
-        if _step_has_output(steps, "5")
-        else None
-    )
-    plan_check = validation or (
+    plan_check = (
         _read_json(output_dir / "plan_check.json")
         if _step_has_output(steps, "5")
         else None
     )
+    validation = (
+        _read_json(output_dir / "validation_report.json")
+        if _step_has_output(steps, "6")
+        else None
+    )
     pr = (
         _read_text(output_dir / "pr_summary.md", max_chars=80_000)
-        if _step_has_output(steps, "6")
+        if _step_has_output(steps, "7")
         else ""
     )
     run_summary = (

@@ -23,13 +23,14 @@ function renderSteps(steps) {
   el.innerHTML = steps
     .map(
       (s) => {
+        const total = steps.length || 7;
         const spin =
           s.status === "running"
             ? '<span class="step-spinner" aria-hidden="true"></span>'
             : "";
         return `
     <div class="step-card ${esc(s.status)}">
-      <div class="id">Step ${esc(s.id)}/6</div>
+      <div class="id">Step ${esc(s.id)}/${total}</div>
       <div class="title">${spin}${esc(s.title)}</div>
       <div class="detail">${esc(s.detail || s.description || "")}</div>
       <span class="badge ${esc(s.status)}">${esc(s.status)}</span>
@@ -211,11 +212,11 @@ function renderPlan(planMd, steps) {
 }
 
 function renderPr(prMd, steps) {
-  const st = stepStatus(steps, "6");
+  const st = stepStatus(steps, "7");
   let text = "";
   if (st === "running") text = "Writing PR summary…";
   else if (prMd?.trim()) text = prMd;
-  else text = "PR summary not generated yet — step 6";
+  else text = "PR summary not generated yet — step 7";
   $("#pr-body").textContent = text;
 }
 
@@ -277,41 +278,70 @@ function renderDiff(patchFiles, stats, raw, steps) {
 
 function renderValidation(files, steps) {
   const el = $("#tab-validation");
-  const st = stepStatus(steps, "5");
-  if (st === "running") {
-    el.innerHTML = '<p class="empty">Validating patch against plan…</p>';
+  const stPlan = stepStatus(steps, "5");
+  const stGo = stepStatus(steps, "6");
+  if (stGo === "running") {
+    el.innerHTML = '<p class="empty">Running git apply + go build + go test…</p>';
     return;
   }
-  const check = files.plan_check || files.validation;
-  if (!check) {
-    el.innerHTML = '<p class="empty">Run step 5 to validate patch vs plan</p>';
+  if (stPlan === "running") {
+    el.innerHTML = '<p class="empty">Checking plan adherence…</p>';
     return;
   }
-  const aligned = check.aligned;
-  const badge = aligned
-    ? '<span class="badge ok">aligned</span>'
-    : '<span class="badge fail">not aligned</span>';
-  const devs = (check.deviations || [])
-    .map((d) => `<li>${esc(String(d))}</li>`)
-    .join("");
-  let html = `
-    <div class="patch-stats">${badge} · confidence: ${esc(check.confidence || "?")}</div>
-    <p>${esc(check.summary || "")}</p>
-    <h3>File comparison</h3>
-    <table class="kv-table"><tbody>
-      <tr><th>Planned</th><td><pre class="json-block">${esc((check.planned_files || []).join("\n") || "—")}</pre></td></tr>
-      <tr><th>In patch</th><td><pre class="json-block">${esc((check.patch_files || []).join("\n") || "—")}</pre></td></tr>
-      <tr><th>Missing from patch</th><td><pre class="json-block">${esc((check.missing_from_patch || []).join("\n") || "—")}</pre></td></tr>
-      <tr><th>Extra in patch</th><td><pre class="json-block">${esc((check.extra_in_patch || []).join("\n") || "—")}</pre></td></tr>
-    </tbody></table>
-    ${devs ? `<h3>Deviations</h3><ul class="events">${devs}</ul>` : ""}
-  `;
+
+  let html = "";
+
+  const planCheck = files.plan_check;
+  if (planCheck) {
+    const aligned = planCheck.aligned;
+    const badge = aligned
+      ? '<span class="badge ok">plan aligned</span>'
+      : '<span class="badge fail">plan mismatch</span>';
+    const devs = (planCheck.deviations || [])
+      .map((d) => `<li>${esc(String(d))}</li>`)
+      .join("");
+    html += `
+      <h3>Plan adherence (step 5)</h3>
+      <div class="patch-stats">${badge} · confidence: ${esc(planCheck.confidence || "?")}</div>
+      <p>${esc(planCheck.summary || "")}</p>
+      ${devs ? `<ul class="events">${devs}</ul>` : ""}
+    `;
+  }
+
+  const vr = files.validation;
+  if (vr) {
+    const passed = vr.overall_passed;
+    const badge = passed
+      ? '<span class="badge ok">tests pass</span>'
+      : '<span class="badge fail">tests fail</span>';
+    const cmds = (vr.test_commands || [])
+      .map((c) => `<li><code>${esc(Array.isArray(c) ? c.join(" ") : c)}</code></li>`)
+      .join("");
+    html += `
+      <h3>Go validation (step 6)</h3>
+      <div class="patch-stats">${badge}</div>
+      <table class="kv-table"><tbody>
+        <tr><th>Apply</th><td>${vr.apply_passed ? "OK" : "FAIL"}</td></tr>
+        <tr><th>Build</th><td>${vr.build_passed === null ? "skipped" : vr.build_passed ? "OK" : "FAIL"}</td></tr>
+        <tr><th>Tests</th><td>${vr.tests_passed === null ? "skipped" : vr.tests_passed ? "PASS" : "FAIL"}</td></tr>
+        <tr><th>Tiers</th><td>${esc((vr.tiers_run || []).join(" → "))}</td></tr>
+        <tr><th>Packages</th><td>${esc((vr.packages || []).join(", "))}</td></tr>
+      </tbody></table>
+      ${cmds ? `<h4>Commands</h4><ul class="events">${cmds}</ul>` : ""}
+      ${vr.test_output ? `<h4>Output</h4><pre class="log-tail">${esc(vr.test_output.slice(-8000))}</pre>` : ""}
+      ${vr.error ? `<p class="err">${esc(vr.error)}</p>` : ""}
+    `;
+  }
+
+  if (!html) {
+    el.innerHTML = '<p class="empty">Run steps 5–6 to validate the patch</p>';
+    return;
+  }
+
   if (files.run_summary) {
     html += "<h3>Run summary</h3>";
     html += `<pre class="json-block">${esc(JSON.stringify(files.run_summary, null, 2))}</pre>`;
   }
-  html += "<h3>Full report</h3>";
-  html += `<pre class="json-block">${esc(JSON.stringify(check, null, 2))}</pre>`;
   el.innerHTML = html;
 }
 

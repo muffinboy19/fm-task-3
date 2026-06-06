@@ -1,7 +1,3 @@
-"""
-Open Source Issue Solver — agent for open-source Go repositories.
-"""
-
 import argparse
 import json
 import os
@@ -10,12 +6,13 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from modules.config import get, get_gemini_api_keys, get_cursor_api_key, get_llm_provider
+from modules.config import get_env, get_gemini_api_keys, get_cursor_api_key, get_llm_provider
 from modules.agent_logger import init_logger, get_logger
 from modules.issue_understanding import IssueUnderstanding
 from modules.context_builder import ContextBuilder
 from modules.code_reasoning_agent import CodeReasoningAgent
 from modules.code_generator import CodeGenerator
+from modules.plan_adherence_checker import PlanAdherenceChecker
 from modules.validator import Validator
 from modules.pr_writer import PRWriter
 from modules.convention import format_conventions_block, load_conventions_prompt
@@ -56,8 +53,13 @@ def parse_args():
     parser.add_argument(
         "--ui-port",
         type=int,
-        default=int(get("DASHBOARD_PORT", "8765") or "8765"),
+        default=int(get_env("DASHBOARD_PORT", "8765") or "8765"),
         help="Port for live dashboard when --ui is set",
+    )
+    parser.add_argument(
+        "--validation-full",
+        action="store_true",
+        help="Run go test ./... instead of package-scoped tests",
     )
     parser.add_argument(
         "--list-candidates",
@@ -67,7 +69,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def _fallback_pr_summary(issue: dict, plan: str, result: dict) -> str:
+def build_fallback_pr_summary(issue: dict, plan: str, result: dict) -> str:
     status = "passed" if result.get("passed") else "failed or skipped"
     return f"""# Fix: {issue['title']}
 
@@ -87,8 +89,35 @@ Automated fix for {issue['url']}. Validation: **{status}**.
 """
 
 
-def _env_bool(key: str, default: bool = False) -> bool:
-    val = get(key, "false" if not default else "true").lower()
+def build_draft_pr_summary(issue: dict, plan: str, result: dict) -> str:
+    err = result.get("error") or "Go validation failed"
+    return f"""# [DRAFT — VALIDATION FAILED] {issue['title']}
+
+> **Do not open this PR.** The generated patch did not pass `git apply` and/or `go test`.
+
+## Issue
+{issue['url']}
+
+## Validation error
+```
+{err[:2000]}
+```
+
+## Test output
+```
+{(result.get('test_output') or 'n/a')[:3000]}
+```
+
+## Plan (for reference)
+{plan[:1500]}
+
+## Next steps
+- Re-run the agent or fix the patch manually before submitting.
+"""
+
+
+def parse_env_bool(key: str, default: bool = False) -> bool:
+    val = get_env(key, "false" if not default else "true").lower()
     return val in ("1", "true", "yes", "on")
 
 
@@ -124,22 +153,24 @@ def main():
             print(f"  {item['repo']}: {item['reason']}")
         return
 
-    issue_url = args.issue or get("GITHUB_ISSUE_URL")
+    issue_url = args.issue or get_env("GITHUB_ISSUE_URL")
     explicit_repo = args.repo or None
     if args.issue:
         os.environ["GITHUB_ISSUE_URL"] = args.issue
-    output_dir = Path(args.output or get("OUTPUT_DIR", "./output")).resolve()
-    log_dir = Path(args.log_dir or get("LOG_DIR", "./logs")).resolve()
+    output_dir = Path(args.output or get_env("OUTPUT_DIR", "./output")).resolve()
+    log_dir = Path(args.log_dir or get_env("LOG_DIR", "./logs")).resolve()
+    os.environ["OUTPUT_DIR"] = str(output_dir)
+    os.environ["LOG_DIR"] = str(log_dir)
     api_key = args.api_key or None
-    github_token = args.github_token or get("GITHUB_TOKEN") or None
-    dry_run = args.dry_run or _env_bool("DRY_RUN")
+    github_token = args.github_token or get_env("GITHUB_TOKEN") or None
+    dry_run = args.dry_run or parse_env_bool("DRY_RUN")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     clear_stale_run_outputs(output_dir)
 
     log = init_logger(log_dir, output_dir=output_dir)
 
-    ui_enabled = not args.no_ui and _env_bool("DASHBOARD_UI", default=True)
+    ui_enabled = not args.no_ui and parse_env_bool("DASHBOARD_UI", default=True)
     if ui_enabled:
         from modules.dashboard_server import start_dashboard_server
 
@@ -190,7 +221,6 @@ def main():
     ):
         reset_repo(repo_path, log)
 
-    # ── Step 1 ───────────────────────────────────────────────────
     log.step_start("1", "Extract raw issue + structured intake...")
     try:
         issue = IssueUnderstanding(
@@ -236,7 +266,6 @@ def main():
         log.finalize(success=True, summary=summary)
         return
 
-    # ── Step 2 ───────────────────────────────────────────────────
     log.step_start("2", "path anchors + curated grep + slice...")
     try:
         context = ContextBuilder(repo_path=repo_path).build(issue)
@@ -295,7 +324,6 @@ def main():
         log.finalize(success=True, summary=summary)
         return
 
-    # ── Step 3 ───────────────────────────────────────────────────
     log.step_start("3", "LLM generating fix plan...")
     try:
         plan = CodeReasoningAgent(api_key=api_key).plan(issue=issue, context=context)
@@ -307,7 +335,6 @@ def main():
         log.step_fail("3", str(e))
         sys.exit(1)
 
-    # ── Step 4 ───────────────────────────────────────────────────
     log.step_start("4", "LLM generating unified diff...")
     try:
         generator = CodeGenerator(api_key=api_key, repo_path=repo_path)
@@ -335,33 +362,28 @@ def main():
         log.finalize(success=True, summary=summary)
         return
 
-    # ── Step 5 — Validation (plan adherence only) ──────────────────
     plan_aligned = True
+    plan_check_result: dict = {}
     if dry_run:
         log.step_skip("5", "DRY_RUN=true")
-        result = {
-            "passed": None,
-            "plan_aligned": None,
-            "test_output": "dry-run",
-            "final_patch": patch,
-        }
     else:
-        log.step_start("5", "Validating patch matches plan...")
+        log.step_start("5", "Checking patch matches plan...")
         try:
-            result = Validator(api_key=api_key).validate(plan=plan, patch=patch)
-            vr = result.get("validation_report") or {}
-            plan_aligned = bool(result.get("plan_aligned"))
+            plan_check_result = PlanAdherenceChecker(api_key=api_key).check(
+                plan=plan, patch=patch
+            )
+            plan_aligned = bool(plan_check_result.get("plan_aligned"))
+            pc = plan_check_result.get("plan_check") or {}
             log.kv("Plan aligned", plan_aligned)
-            log.kv("Confidence", vr.get("confidence"))
-            log.artifact("Validation report", str(output_dir / "validation_report.json"))
+            log.kv("Confidence", pc.get("confidence"))
             log.artifact("Plan check", str(output_dir / "plan_check.json"))
 
-            summary_text = (vr.get("summary") or result.get("error") or "")[:120]
-            if result["passed"]:
+            summary_text = (plan_check_result.get("summary") or "")[:120]
+            if plan_check_result["passed"]:
                 log.step_ok("5", summary_text or "Patch matches plan")
             else:
                 log.step_warn("5", summary_text[:200])
-                deviations = (vr.get("deviations") or [])[:8]
+                deviations = (pc.get("deviations") or [])[:8]
                 if deviations:
                     log.info("Regenerating patch to align with plan...")
                     try:
@@ -370,37 +392,30 @@ def main():
                             context,
                             plan,
                             patch,
-                            "Plan validation failed. Fix ALL of the following:\n"
+                            "Plan adherence failed. Fix ALL of the following:\n"
                             + "\n".join(f"- {d}" for d in deviations)
                             + f"\n\nSummary: {summary_text}",
                         )
                         patch_path.write_text(regen, encoding="utf-8")
                         patch = regen
                         log.diff_summary(patch, str(patch_path))
-                        result = Validator(api_key=api_key).validate(
+                        plan_check_result = PlanAdherenceChecker(api_key=api_key).check(
                             plan=plan, patch=patch
                         )
-                        vr = result.get("validation_report") or {}
-                        plan_aligned = bool(result.get("plan_aligned"))
-                        if result["passed"]:
+                        plan_aligned = bool(plan_check_result.get("plan_aligned"))
+                        if plan_check_result["passed"]:
                             log.step_ok("5", "Aligned after regeneration")
                         else:
                             log.step_warn(
                                 "5",
-                                (vr.get("summary") or "still not aligned")[:200],
+                                (plan_check_result.get("summary") or "still not aligned")[:200],
                             )
                     except Exception as regen_err:
                         log.warning(f"Plan-alignment regeneration failed: {regen_err}")
         except Exception as e:
             plan_aligned = False
             log.step_fail("5", str(e))
-            result = {
-                "passed": False,
-                "plan_aligned": False,
-                "final_patch": patch,
-                "test_output": str(e),
-                "error": str(e),
-            }
+            plan_check_result = {"passed": False, "error": str(e)}
 
     if args.stop_after and args.stop_after <= 5:
         summary = {
@@ -410,7 +425,6 @@ def main():
             "patch": str(patch_path),
             "plan": str(output_dir / "plan.md"),
             "plan_check": str(output_dir / "plan_check.json"),
-            "validation": str(output_dir / "validation_report.json"),
             "dashboard": str(log.dashboard_path),
         }
         (output_dir / "run_summary.json").write_text(
@@ -419,38 +433,137 @@ def main():
         log.finalize(success=plan_aligned if not dry_run else True, summary=summary)
         return
 
-    # ── Step 6 ───────────────────────────────────────────────────
-    log.step_start("6", "Writing PR summary...")
-    pr_path = output_dir / "pr_summary.md"
-    try:
-        pr = PRWriter(api_key=api_key).write(
-            issue=issue, context=context, plan=plan,
-            patch=result["final_patch"],
-            test_output=result.get("test_output", ""),
+    validation_full = args.validation_full or parse_env_bool("VALIDATION_FULL")
+    result: dict = {
+        "passed": None,
+        "validation_passed": None,
+        "plan_aligned": plan_aligned,
+        "test_output": "",
+        "final_patch": patch,
+    }
+    if dry_run:
+        log.step_skip("6", "DRY_RUN=true")
+        result["test_output"] = "dry-run"
+    else:
+        log.step_start("6", "git apply + go build + scoped go test...")
+        try:
+            validator = Validator(
+                repo_path=repo_path,
+                full_suite=validation_full,
+            )
+            result = validator.validate(patch=patch, plan=plan)
+            vr = result.get("validation_report") or {}
+            log.kv("Apply passed", vr.get("apply_passed"))
+            log.kv("Build passed", vr.get("build_passed"))
+            log.kv("Tests passed", vr.get("tests_passed"))
+            if vr.get("test_commands"):
+                log.kv("Test commands", vr["test_commands"])
+            log.artifact("Validation report", str(output_dir / "validation_report.json"))
+
+            if result["passed"]:
+                log.step_ok("6", "Patch applies and tests pass")
+            else:
+                err = result.get("error") or "validation failed"
+                log.step_warn("6", err[:200])
+                test_out = result.get("test_output") or ""
+                if test_out and "go test" in test_out.lower():
+                    log.info("Regenerating patch after test failure...")
+                    try:
+                        regen = generator.regenerate(
+                            issue,
+                            context,
+                            plan,
+                            patch,
+                            "Go validation failed. Fix the patch so it applies and tests pass.\n\n"
+                            + test_out[-6000:],
+                        )
+                        patch_path.write_text(regen, encoding="utf-8")
+                        patch = regen
+                        log.diff_summary(patch, str(patch_path))
+                        result = validator.validate(patch=patch, plan=plan)
+                        if result["passed"]:
+                            log.step_ok("6", "Tests pass after regeneration")
+                        else:
+                            log.step_warn(
+                                "6",
+                                (result.get("error") or "tests still failing")[:200],
+                            )
+                    except Exception as regen_err:
+                        log.warning(f"Test-failure regeneration failed: {regen_err}")
+        except Exception as e:
+            log.step_fail("6", str(e))
+            result = {
+                "passed": False,
+                "validation_passed": False,
+                "plan_aligned": plan_aligned,
+                "final_patch": patch,
+                "test_output": str(e),
+                "error": str(e),
+            }
+
+    result["plan_aligned"] = plan_aligned
+    result["final_patch"] = patch
+
+    if args.stop_after and args.stop_after <= 6:
+        summary = {
+            "issue": issue["url"],
+            "title": issue["title"],
+            "plan_aligned": plan_aligned,
+            "validation_passed": result.get("validation_passed"),
+            "patch": str(patch_path),
+            "plan": str(output_dir / "plan.md"),
+            "plan_check": str(output_dir / "plan_check.json"),
+            "validation": str(output_dir / "validation_report.json"),
+            "dashboard": str(log.dashboard_path),
+        }
+        (output_dir / "run_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
         )
-        log.step_ok("6", str(pr_path))
-    except Exception as e:
-        log.warning(f"PR writer fallback: {e}")
-        pr = _fallback_pr_summary(issue, plan, result)
-        log.step_ok("6", f"{pr_path} (fallback)")
-    pr_path.write_text(pr, encoding="utf-8")
-    log.artifact("PR summary", str(pr_path))
+        passed = result.get("passed") is True
+        log.finalize(success=passed if not dry_run else True, summary=summary)
+        return
+
+    validation_ok = result.get("validation_passed") is True
+    if not dry_run and result.get("validation_passed") is False:
+        log.step_start("7", "Writing PR summary (validation failed — draft only)...")
+        pr_path = output_dir / "pr_summary.md"
+        pr = build_draft_pr_summary(issue, plan, result)
+        pr_path.write_text(pr, encoding="utf-8")
+        log.step_warn("7", f"{pr_path} (draft — validation failed)")
+        log.artifact("PR summary (draft)", str(pr_path))
+    else:
+        log.step_start("7", "Writing PR summary...")
+        pr_path = output_dir / "pr_summary.md"
+        try:
+            pr = PRWriter(api_key=api_key).write(
+                issue=issue, context=context, plan=plan,
+                patch=result["final_patch"],
+                test_output=result.get("test_output", ""),
+            )
+            log.step_ok("7", str(pr_path))
+        except Exception as e:
+            log.warning(f"PR writer fallback: {e}")
+            pr = build_fallback_pr_summary(issue, plan, result)
+            log.step_ok("7", f"{pr_path} (fallback)")
+        pr_path.write_text(pr, encoding="utf-8")
+        log.artifact("PR summary", str(pr_path))
 
     summary = {
         "issue": issue["url"],
         "title": issue["title"],
         "repo": str(repo_path) if repo_path else None,
-        "plan_aligned": result.get("plan_aligned", plan_aligned),
-        "validation_passed": result.get("passed"),
+        "plan_aligned": plan_aligned,
+        "validation_passed": result.get("validation_passed"),
         "patch": str(patch_path),
         "plan": str(output_dir / "plan.md"),
         "plan_check": str(output_dir / "plan_check.json"),
+        "validation": str(output_dir / "validation_report.json"),
         "pr_summary": str(pr_path),
         "dashboard": str(log.dashboard_path),
     }
     (output_dir / "run_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    success = result.get("passed") is True or (dry_run and result.get("passed") is None)
+    success = validation_ok or (dry_run and result.get("validation_passed") is None)
     log.finalize(success=success, summary=summary)
 
 

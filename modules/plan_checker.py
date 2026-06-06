@@ -1,7 +1,5 @@
 """
-Plan adherence checker (used by Validator).
-
-Verifies the generated patch matches the fix plan from step 3.
+Plan adherence checker — LLM compares fix.patch to plan.md (pipeline step 5).
 """
 
 import json

@@ -6,6 +6,68 @@ import re
 import subprocess
 from pathlib import Path
 
+# Placeholder hashes LLMs often invent (git apply may still fail on context)
+_FAKE_HASH_VALUES = frozenset(
+    f"{d * 7}" for d in "0123456789"
+) | frozenset({"0000000", "1111111", "2222222", "3333333", "4444444"})
+
+
+def _is_fake_index_hash(h: str) -> bool:
+    h = h.strip().lower()
+    if h in _FAKE_HASH_VALUES:
+        return True
+    # all same hex digit, e.g. aaaaaaa
+    if len(h) >= 7 and len(set(h)) == 1:
+        return True
+    return False
+
+
+def patch_format_issues(patch: str) -> list[str]:
+    """Static format checks (no git invocation)."""
+    issues: list[str] = []
+    if not patch.strip():
+        return ["EMPTY_PATCH"]
+
+    if not patch.lstrip().startswith("diff --git"):
+        issues.append("MISSING_DIFF_GIT_HEADER")
+
+    if "```" in patch:
+        issues.append("MARKDOWN_FENCE_LEAKED_INTO_PATCH")
+
+    for m in re.finditer(r"^index ([0-9a-f]+)\.\.([0-9a-f]+)", patch, re.MULTILINE | re.I):
+        if _is_fake_index_hash(m.group(1)) or _is_fake_index_hash(m.group(2)):
+            issues.append(f"FAKE_INDEX_HASH: index {m.group(1)}..{m.group(2)}")
+
+    sections = re.split(r"(?=^diff --git )", patch, flags=re.MULTILINE)
+    for i, section in enumerate(sections):
+        if not section.strip() or not section.lstrip().startswith("diff --git"):
+            continue
+        header_end = section.find("\n---")
+        header = section if header_end == -1 else section[:header_end]
+        if "index " not in header:
+            issues.append(f"SECTION_{i}_MISSING_INDEX_LINE")
+
+    if not patch.endswith("\n"):
+        issues.append("MISSING_FINAL_NEWLINE")
+
+    return issues
+
+
+def patch_applies(diag: dict) -> bool:
+    """True when git apply --check passed and no fake index / missing index issues."""
+    blocking = {
+        "EMPTY_PATCH",
+        "MISSING_DIFF_GIT_HEADER",
+        "MARKDOWN_FENCE_LEAKED_INTO_PATCH",
+        "MISSING_FINAL_NEWLINE",
+    }
+    for issue in diag.get("issues") or []:
+        if issue in blocking or issue.startswith("FAKE_INDEX") or "MISSING_INDEX" in issue:
+            return False
+        if issue.startswith("GIT_APPLY:"):
+            return False
+    return diag.get("git_apply_exit") == 0
+
 
 def analyze_patch(patch: str, repo_path: Path) -> dict:
     """Return structured diagnosis (not token-related unless response is tiny)."""
@@ -16,19 +78,18 @@ def analyze_patch(patch: str, repo_path: Path) -> dict:
         "ends_with_newline": patch.endswith("\n"),
         "diff_file_count": len(re.findall(r"^diff --git ", patch, re.MULTILINE)),
         "hunk_count": len(re.findall(r"^@@ ", patch, re.MULTILINE)),
-        "issues": [],
+        "issues": patch_format_issues(patch),
     }
 
-    if not patch.strip():
-        diagnosis["issues"].append("EMPTY_PATCH")
+    if "EMPTY_PATCH" in diagnosis["issues"]:
         return diagnosis
 
-    if not patch.lstrip().startswith("diff --git"):
-        diagnosis["issues"].append("MISSING_DIFF_GIT_HEADER")
-
-    # Unclosed markdown fence in raw storage
-    if "```" in patch:
-        diagnosis["issues"].append("MARKDOWN_FENCE_LEAKED_INTO_PATCH")
+    if not diagnosis["issues"] or not any(
+        i.startswith("MISSING_DIFF") for i in diagnosis["issues"]
+    ):
+        pass  # continue with hunk checks
+    elif "MISSING_DIFF_GIT_HEADER" in diagnosis["issues"]:
+        return diagnosis
 
     # Each hunk should end before next diff --git; check last lines of each section
     sections = re.split(r"(?=^diff --git )", patch, flags=re.MULTILINE)
@@ -69,8 +130,14 @@ def analyze_patch(patch: str, repo_path: Path) -> dict:
                 f"SECTION_{i}_ENDS_ON_CHANGE_LINE: hunk likely truncated (last line: {last_line[:60]})"
             )
 
+    # git apply --check (skip if already clearly invalid)
+    format_blockers = {"EMPTY_PATCH", "MISSING_DIFF_GIT_HEADER", "MARKDOWN_FENCE_LEAKED_INTO_PATCH"}
+    if format_blockers & set(diagnosis["issues"]):
+        return diagnosis
+
     if not diagnosis["ends_with_newline"]:
-        diagnosis["issues"].append("MISSING_FINAL_NEWLINE")
+        if "MISSING_FINAL_NEWLINE" not in diagnosis["issues"]:
+            diagnosis["issues"].append("MISSING_FINAL_NEWLINE")
 
     # git apply --check
     if repo_path.exists() and (repo_path / ".git").exists():
@@ -105,6 +172,11 @@ def patch_files_changed(patch: str) -> list[str]:
 def patch_includes_tests(patch: str) -> bool:
     """True if patch touches at least one *_test.go file."""
     return any(p.endswith("_test.go") for p in patch_files_changed(patch))
+
+
+def patch_touches_go(patch: str) -> bool:
+    """True if patch modifies or adds any .go source file."""
+    return any(p.endswith(".go") for p in patch_files_changed(patch))
 
 
 def packages_to_test(patch: str) -> list[str]:

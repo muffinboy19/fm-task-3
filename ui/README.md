@@ -20,7 +20,7 @@ Requires `logs/live_state.json` (written automatically when the agent runs).
 
 ## What you see
 
-- **Pipeline** — step 1–6 status (pending / running / ok / fail / warn)
+- **Pipeline** — step 1–7 status (pending / running / ok / fail / warn)
 - **Issue / Context / Plan / Diff / Validation / PR** — output artifacts
 - **Diff** — colorized unified diff (+ green / − red)
 - **Logs** — tail of the current agent log

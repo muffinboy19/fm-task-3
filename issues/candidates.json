@@ -27,8 +27,32 @@
       "url": "https://github.com/gin-gonic/gin/issues/4688",
       "title": "AsciiJSON non-BMP malformed \\u escapes",
       "size": "small",
-      "status": "validated_by_agent",
-      "notes": "Already run successfully; compare to PR #4627"
+      "status": "eval_pass",
+      "notes": "Run 2: full pass — render/json.go matches PR #4627"
+    },
+    {
+      "repo": "gin-gonic/gin",
+      "url": "https://github.com/gin-gonic/gin/issues/4645",
+      "title": "Hijack/CloseNotify panic when wrapper unsupported",
+      "size": "small",
+      "status": "eval_pass_apply_only",
+      "notes": "Run 2: apply+tests pass via edit→git diff; only test file changed, missing response_writer.go fix"
+    },
+    {
+      "repo": "gin-gonic/gin",
+      "url": "https://github.com/gin-gonic/gin/issues/4535",
+      "title": "tree panic findCaseInsensitivePathRec",
+      "size": "medium",
+      "status": "eval_fail_build",
+      "notes": "Run 2: edit mode truncated tree.go; go build caught it"
+    },
+    {
+      "repo": "gin-gonic/gin",
+      "url": "https://github.com/gin-gonic/gin/issues/4422",
+      "title": "RunFd os.File resource leak",
+      "size": "small",
+      "status": "eval_abort",
+      "notes": "Run 2: step 3 Cursor API error — re-run needed"
     },
     {
       "repo": "go-playground/validator",

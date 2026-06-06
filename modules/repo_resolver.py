@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from modules.config import PROJECT_ROOT, get
+from modules.config import PROJECT_ROOT, get_env
 
 _ISSUE_URL_RE = re.compile(r"github\.com/([^/]+)/([^/]+)/issues/(\d+)")
 
@@ -23,15 +23,15 @@ def parse_issue_url(url: str) -> tuple[str, str, int]:
     return m.group(1), m.group(2), int(m.group(3))
 
 
-def test_repo_dir(owner: str, repo: str) -> Path:
-    base = PROJECT_ROOT / get("TEST_REPO_DIR", "test_repo")
+def clone_directory_for_repo(owner: str, repo: str) -> Path:
+    base = PROJECT_ROOT / get_env("TEST_REPO_DIR", "test_repo")
     return (base / repo).resolve()
 
 
 def ensure_repo_clone(issue_url: str, log=None) -> Path:
     """Clone github.com/owner/repo into test_repo/<repo> if missing."""
     owner, repo, _ = parse_issue_url(issue_url)
-    dest = test_repo_dir(owner, repo)
+    dest = clone_directory_for_repo(owner, repo)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     if (dest / ".git").is_dir():
@@ -52,7 +52,7 @@ def ensure_repo_clone(issue_url: str, log=None) -> Path:
 
 
 def default_output_dir() -> Path:
-    d = Path(get("OUTPUT_DIR", "./output"))
+    d = Path(get_env("OUTPUT_DIR", "./output"))
     return d.resolve() if d.is_absolute() else (PROJECT_ROOT / d).resolve()
 
 
@@ -119,7 +119,7 @@ def effective_repo_path(
             return path
 
     out = output_dir or default_output_dir()
-    url = (issue_url or get("GITHUB_ISSUE_URL")).strip()
+    url = (issue_url or get_env("GITHUB_ISSUE_URL")).strip()
     cached = repo_path_from_manifest(out, issue_url=url or None)
     if cached:
         if log:

@@ -10,7 +10,7 @@ from typing import Optional
 from cursor_sdk import Agent, AgentOptions, LocalAgentOptions
 
 from modules.agent_logger import get_logger
-from modules.config import get, get_cursor_api_key
+from modules.config import get_env, get_cursor_api_key
 from modules.repo_resolver import effective_repo_path
 
 
@@ -23,7 +23,7 @@ class CursorLLMClient:
                 "(or cursor_api_key)."
             )
         os.environ["CURSOR_API_KEY"] = self.api_key
-        self.model = get("CURSOR_MODEL", "composer-2.5")
+        self.model = get_env("CURSOR_MODEL", "composer-2.5")
         self.repo_cwd = str(effective_repo_path())
 
     def complete(

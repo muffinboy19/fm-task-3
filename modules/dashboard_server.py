@@ -15,18 +15,18 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from modules.config import PROJECT_ROOT, get
+from modules.config import PROJECT_ROOT, get_env
 from modules.live_state import build_live_payload
 
 UI_DIR = PROJECT_ROOT / "ui"
 DEFAULT_PORT = 8765
 
 
-def _dirs() -> tuple[Path, Path]:
-    log_dir = Path(get("LOG_DIR", "./logs")).resolve()
+def resolve_dashboard_paths() -> tuple[Path, Path]:
+    log_dir = Path(get_env("LOG_DIR", "./logs")).resolve()
     if not log_dir.is_absolute():
         log_dir = (PROJECT_ROOT / log_dir).resolve()
-    output_dir = Path(get("OUTPUT_DIR", "./output")).resolve()
+    output_dir = Path(get_env("OUTPUT_DIR", "./output")).resolve()
     if not output_dir.is_absolute():
         output_dir = (PROJECT_ROOT / output_dir).resolve()
     return log_dir, output_dir
@@ -125,7 +125,7 @@ def start_dashboard_server(
 ) -> ThreadingHTTPServer:
     log_d, out_d = log_dir, output_dir
     if log_d is None or out_d is None:
-        ld, od = _dirs()
+        ld, od = resolve_dashboard_paths()
         log_d = log_d or ld
         out_d = out_d or od
 
@@ -145,7 +145,7 @@ def main() -> None:
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
-    log_dir, output_dir = _dirs()
+    log_dir, output_dir = resolve_dashboard_paths()
     url = f"http://127.0.0.1:{args.port}/"
     print(f"Dashboard: {url}")
     print(f"Log dir:   {log_dir}")

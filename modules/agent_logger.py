@@ -27,8 +27,9 @@ class AgentLogger:
         ("2", "Context builder", "Path anchors + curated grep + slice"),
         ("3", "Code reasoning", "LLM fix plan"),
         ("4", "Code generator", "LLM unified diff"),
-        ("5", "Validator", "Patch matches plan"),
-        ("6", "PR writer", "LLM PR summary"),
+        ("5", "Plan adherence", "Patch matches plan (LLM)"),
+        ("6", "Validator", "git apply + go build + go test"),
+        ("7", "PR writer", "LLM PR summary"),
     ]
 
     def __init__(self, log_dir: Path, output_dir: Optional[Path] = None):
@@ -76,8 +77,6 @@ class AgentLogger:
             target=self._heartbeat_loop, name="dashboard-heartbeat", daemon=True
         )
         self._heartbeat_thread.start()
-
-    # ── step UI ──────────────────────────────────────────────────
 
     def step_start(self, step_id: str, extra: str = ""):
         if step_id in self._step_state:
@@ -131,7 +130,7 @@ class AgentLogger:
             if ln.startswith("diff --git"):
                 parts = ln.split()
                 if len(parts) >= 4:
-                    files.append(parts[3][2:])  # b/path
+                    files.append(parts[3][2:])
         adds = sum(1 for ln in lines if ln.startswith("+") and not ln.startswith("+++"))
         dels = sum(1 for ln in lines if ln.startswith("-") and not ln.startswith("---"))
         has_tests = any(f.endswith("_test.go") for f in files)
@@ -148,8 +147,6 @@ class AgentLogger:
         preview = patch if len(patch) <= 8000 else patch[:8000] + "\n... (truncated in dashboard)"
         self._report_append(f"```diff\n{preview}\n```\n")
         self._write_dashboard()
-
-    # ── legacy API (maps to step UI) ─────────────────────────────
 
     def section(self, title: str, step: Optional[str] = None):
         sid = step.split("/")[0] if step and "/" in step else None
@@ -218,8 +215,6 @@ class AgentLogger:
         if self.html_dashboard_url:
             self._py_logger.info("Live UI    : %s", self.html_dashboard_url)
 
-    # ── internals ────────────────────────────────────────────────
-
     def _report_append(self, text: str):
         if not hasattr(self, "_report_buf"):
             self._report_buf = [
@@ -241,6 +236,7 @@ class AgentLogger:
             self._events = self._events[-30:]
 
     def _dashboard_table(self) -> str:
+        n_steps = len(self.STEPS)
         lines = [
             "## Pipeline status\n",
             "| Step | Status | What | Detail |",
@@ -250,7 +246,7 @@ class AgentLogger:
             st = self._step_state[sid]
             icon = STATUS_ICON.get(st["status"], "?")
             lines.append(
-                f"| **{sid}/6** {title} | {icon} {st['status'].upper()} "
+                f"| **{sid}/{n_steps}** {title} | {icon} {st['status'].upper()} "
                 f"| {self.STEPS[int(sid)-1][2]} | {st.get('detail', '')} |"
             )
         return "\n".join(lines) + "\n"
@@ -329,13 +325,14 @@ class AgentLogger:
         self._print_dashboard_header()
 
     def _print_dashboard_header(self):
+        n_steps = len(self.STEPS)
         print("\n" + "─" * 56)
         print("  PIPELINE STATUS")
         print("─" * 56)
         for sid, title, _ in self.STEPS:
             st = self._step_state[sid]
             icon = STATUS_ICON.get(st["status"], "?")
-            print(f"  {icon}  [{sid}/6] {title:<22} {st['status'].upper():<8}")
+            print(f"  {icon}  [{sid}/{n_steps}] {title:<22} {st['status'].upper():<8}")
         print("─" * 56)
         if self._artifacts:
             print("  Outputs:", ", ".join(a[0] for a in self._artifacts[-4:]))

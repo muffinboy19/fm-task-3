@@ -19,17 +19,21 @@ Keeps scope tight: which files to change and what behavior to fix.
 **Step 4 — Patch generation**  
 The LLM produces a unified diff (`output/fix.patch`) aligned with the plan and Go style.
 
-**Step 5 — Validation**  
+**Step 5 — Plan adherence**  
 An LLM compares `plan.md` and `fix.patch` for alignment (files, approach, tests).  
-Writes `output/validation_report.json` and `output/plan_check.json`; warns if the patch diverges from the plan.
+Writes `output/plan_check.json`; warns if the patch diverges from the plan.
 
-**Step 6 — PR summary**  
+**Step 6 — Validation (Go testing)**  
+Applies the patch, runs `go build` on affected packages, then scoped `go test` (or `-run` when the plan names tests).  
+Writes `output/validation_report.json`. Use `--validation-full` for `go test ./...`.
+
+**Step 7 — PR summary**  
 The LLM drafts title and body for a pull request in `output/pr_summary.md`.  
 References the issue, plan, patch, and validation outcome.
 
 ```
 main.py → issue_understanding → context_builder → code_reasoning_agent
-       → code_generator → validator → pr_writer
+       → code_generator → plan_adherence_checker → validator → pr_writer
 ```
 
 ## Live demo

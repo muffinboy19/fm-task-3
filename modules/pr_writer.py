@@ -1,5 +1,5 @@
 """
-Module 6 — PR Writer
+Module 7 — PR Writer
 
 Generates a pull request title and body from issue, plan, patch, and test output.
 """

@@ -1,1 +1,10 @@
 .env
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+
+test_repo/
+logs/
+output/
+eval/
