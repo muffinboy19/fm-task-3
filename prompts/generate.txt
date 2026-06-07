@@ -1,2 +1,0 @@
-# Deprecated — use modules/prompt_builder.build_system_prompt("generate")
-# See prompts/roles/generate.txt + prompts/contracts/diff.txt

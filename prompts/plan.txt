@@ -1,7 +1,0 @@
-# Deprecated — use layered prompts via modules/prompt_builder.py
-#
-#   role      → prompts/roles/plan.txt
-#   craft     → prompts/craft.txt
-#   contract  → prompts/contracts/plan.txt
-#
-# Kept for reference only.

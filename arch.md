@@ -68,6 +68,8 @@ An LLM reads the issue + context and writes `plan.md`:
 
 Think of this as the robot’s homework before touching code.
 
+Prompts are **layered** (see [Layered prompts](#layered-prompts) below): role + craft + plan contract in the system message; repo conventions and issue context in the user message.
+
 ---
 
 ### Step 4 — Write the patch (`CodeGenerator`)
@@ -75,8 +77,10 @@ Think of this as the robot’s homework before touching code.
 Another LLM turn produces `fix.patch` — a git diff.
 
 If the diff is broken, the robot retries (up to 4 times):
-1. Try a normal unified diff
-2. Fall back to “edit whole files, then `git diff`”
+1. Try a normal unified diff (`generate` stage — diff contract)
+2. Fall back to “edit whole files, then `git diff`” (`generate_edit` stage — edit contract)
+
+On retries, a fourth layer (`contracts/retry.txt`) is appended with targeted hints from the last failure.
 
 ---
 
@@ -116,12 +120,57 @@ If validation failed, it writes a **draft** warning you not to merge yet.
 |---------------|------------|
 | `main.py` | Starts the 7-step pipeline |
 | `modules/` | One module per step (understand, context, plan, patch, check, validate, PR) |
-| `prompts/` | Text instructions sent to the LLM |
+| `prompts/` | Layered LLM instructions (roles, craft, contracts) |
+| `modules/prompt_builder.py` | Assembles system + user prompt layers per stage |
 | `test_repo/` | Cloned Go repos (gitignored, recreated per run) |
 | `output/` | Results of the latest run (patch, plan, reports) |
 | `logs/` | Detailed run logs + live dashboard files |
 | `ui/` | Small web page to watch progress live |
-| `scripts/eval_*.py` | Batch tests on many GitHub issues |
+
+---
+
+## Layered prompts
+
+Plan and patch generation do not use one big prompt file. `modules/prompt_builder.py` stacks layers from most persistent to most transient:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  SYSTEM MESSAGE (built by build_system_prompt)          │
+│                                                         │
+│  1. Role        — who the model is for this stage       │
+│                 prompts/roles/plan.txt                  │
+│                 prompts/roles/generate.txt              │
+│                 prompts/roles/generate_edit.txt         │
+│                                                         │
+│  2. Craft       — non-negotiable minimal-change rules   │
+│                 prompts/craft.txt (every stage)         │
+│                                                         │
+│  3. Contract    — exact output shape for this stage     │
+│                 prompts/contracts/plan.txt              │
+│                 prompts/contracts/diff.txt              │
+│                 prompts/contracts/edit.txt              │
+│                 prompts/contracts/retry.txt (retries)   │
+└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  USER MESSAGE (built by format_context_block + task)    │
+│                                                         │
+│  4. Conventions — repo style + detected snapshot        │
+│                 prompts/conventions.txt                 │
+│                                                         │
+│  5. Task        — issue, plan, code slices, retry hints │
+│                 (assembled per agent call)              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Why layers?** Role, craft, and output format stay stable across runs. Conventions and task details change per repo and per issue without duplicating the core rules.
+
+| Stage | Used in | System layers |
+|-------|---------|---------------|
+| `plan` | Step 3 — `CodeReasoningAgent` | role + craft + `contracts/plan.txt` |
+| `generate` | Step 4 — unified diff | role + craft + `contracts/diff.txt` |
+| `generate_edit` | Step 4 — full-file fallback | role + craft + `contracts/edit.txt` |
+
+Other steps still use single prompt files: `issue_intake.txt` (Step 1), `plan_check.txt` (Step 5), `pr.txt` (Step 7).
 
 ---
 

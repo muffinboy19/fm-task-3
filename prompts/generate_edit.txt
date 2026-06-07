@@ -1,2 +1,0 @@
-# Deprecated — use modules/prompt_builder.build_system_prompt("generate_edit")
-# See prompts/roles/generate_edit.txt + prompts/contracts/edit.txt
