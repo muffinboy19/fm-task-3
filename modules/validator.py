@@ -14,6 +14,7 @@ from modules.patch_utils import (
     patch_includes_tests,
     patch_integrity_issues,
     patch_touches_go,
+    planned_production_files,
 )
 from modules.repo_resolver import default_output_dir
 
@@ -60,6 +61,7 @@ class Validator:
             patch,
             issue_type=issue_type,
             repo_path=self.repo_path,
+            required_files=planned_production_files(plan) if plan else [],
         )
 
         report: dict = {

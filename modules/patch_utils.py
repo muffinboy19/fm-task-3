@@ -210,6 +210,24 @@ MAX_SINGLE_FILE_LINES = 400
 MAX_FILE_DELETION_RATIO = 0.35
 
 
+def planned_files_from_plan(plan: str) -> list[str]:
+    """Go paths backtick-quoted in the plan's Files to change section (or whole plan)."""
+    section = re.search(r"## Files to change\s*\n(.*?)(?:\n## |\Z)", plan, re.DOTALL | re.I)
+    blob = section.group(1) if section else plan
+    paths = re.findall(r"`([a-zA-Z0-9_./-]+\.go)`", blob)
+    if not paths:
+        paths = re.findall(r"`([a-zA-Z0-9_./-]+\.go)`", plan)
+    seen: list[str] = []
+    for p in paths:
+        if p not in seen:
+            seen.append(p)
+    return seen
+
+
+def planned_production_files(plan: str) -> list[str]:
+    return [p for p in planned_files_from_plan(plan) if not p.endswith("_test.go")]
+
+
 def _file_change_stats(patch: str) -> dict[str, dict]:
     """Per-file added/deleted line counts from unified diff."""
     stats: dict[str, dict] = {}
@@ -236,6 +254,7 @@ def patch_integrity_issues(
     require_production_go: bool = True,
     require_tests: bool = True,
     repo_path: Path | None = None,
+    required_files: list[str] | None = None,
 ) -> list[str]:
     """Static gates before accepting a patch (size, destruction, required files)."""
     issues: list[str] = []
@@ -258,6 +277,11 @@ def patch_integrity_issues(
         issues.append("MISSING_PRODUCTION_GO: patch must change at least one non-test .go file")
     if needs_tests and not tests and prod:
         issues.append("MISSING_TEST_FILE: bug fixes must include a *_test.go change")
+
+    changed = set(files)
+    for req in required_files or []:
+        if req not in changed:
+            issues.append(f"MISSING_PLANNED_FILE: {req}")
 
     for path, st in _file_change_stats(patch).items():
         total = st["adds"] + st["dels"]
@@ -291,7 +315,8 @@ def patch_passes_integrity(
     require_production_go: bool = True,
     require_tests: bool = True,
     repo_path: Path | None = None,
+    required_files: list[str] | None = None,
 ) -> bool:
     return not patch_integrity_issues(
-        patch, issue_type, require_production_go, require_tests, repo_path
+        patch, issue_type, require_production_go, require_tests, repo_path, required_files
     )

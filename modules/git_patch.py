@@ -6,6 +6,21 @@ import re
 import subprocess
 from pathlib import Path
 
+# Aider / search-replace markers — invalid in FILE: edit mode
+_AIDER_MARKER_RE = re.compile(
+    r"^<<<<<<< SEARCH|^=======\s*$|^>>>>>>> REPLACE",
+    re.MULTILINE,
+)
+
+
+def reject_aider_markers(text: str) -> None:
+    """Fail fast if the model mixed SEARCH/REPLACE format into FILE output."""
+    if _AIDER_MARKER_RE.search(text):
+        raise ValueError(
+            "AIDER_MARKER_LEAK: response contains <<<<<<< SEARCH / >>>>>>> REPLACE markers. "
+            "Use FILE: path blocks with full file contents only — not SEARCH/REPLACE."
+        )
+
 
 def ensure_clean_repo(repo_path: Path) -> None:
     """Reset working tree to HEAD (does not fetch)."""
@@ -33,6 +48,8 @@ def parse_file_edits(text: str) -> dict[str, str]:
     """
     edits: dict[str, str] = {}
 
+    reject_aider_markers(text)
+
     for m in re.finditer(
         r"FILE:\s*([^\n`]+)\s*\n```(?:go|golang|text)?\s*\n(.*?)```",
         text,
@@ -50,6 +67,9 @@ def parse_file_edits(text: str) -> dict[str, str]:
         path = _norm_path(m.group(1))
         if path and path not in edits:
             edits[path] = m.group(2)
+
+    for path, content in list(edits.items()):
+        reject_aider_markers(content)
 
     return edits
 
