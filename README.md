@@ -54,23 +54,55 @@ Disable auto-opening the browser with `--no-ui`. Disable the dashboard during CL
 
 ## Setup
 
-**Step 1 — Install**
+### Step 1 — Install Python 3
+
+**macOS** (Homebrew):
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+brew install python@3.12
 ```
 
-**Step 2 — Create `.env`**
+**Windows** (winget):
+
+```powershell
+winget install Python.Python.3.12
+```
+
+No package manager? Download the installer from [python.org/downloads](https://www.python.org/downloads/) (check **Add Python to PATH** on Windows).
+
+Verify:
 
 ```bash
-cp .env.example .env
+python3 --version
 ```
 
-**Step 3 — Configure `.env`**
+On Windows you may use `py -3 --version` instead.
 
-Add your Cursor LLM settings:
+### Step 2 — Install project (one line)
+
+From the repo folder:
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && cp .env.example .env
+```
+
+**Windows (PowerShell):**
+
+```powershell
+py -3 -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt; Copy-Item .env.example .env
+```
+
+**Windows (Command Prompt):**
+
+```cmd
+py -3 -m venv .venv && .venv\Scripts\activate.bat && pip install -r requirements.txt && copy .env.example .env
+```
+
+### Step 3 — Configure `.env`
+
+Edit `.env` and add your Cursor LLM settings:
 
 ```
 LLM_PROVIDER=cursor
@@ -78,15 +110,23 @@ CURSOR_API_KEY=your_cursor_api_key_here
 CURSOR_MODEL=composer-2.5
 ```
 
-Optional: `GITHUB_TOKEN` in `.env` for fetching private issues during the pipeline.
+Optional: `GITHUB_TOKEN` for private repos.
 
-**Step 4 — Run**
+### Step 4 — Run
+
+**macOS / Linux:**
 
 ```bash
-python main.py
+source .venv/bin/activate && python main.py
 ```
 
-The UI opens in your browser — paste an issue URL and click Run. Results land in `output/` and `logs/run_report.md`.
+**Windows (PowerShell):**
+
+```powershell
+.\.venv\Scripts\Activate.ps1; python main.py
+```
+
+The UI opens in your browser — paste an issue URL and click **Run**. Results land in `output/` and `logs/run_report.md`.
 
 Or run one issue from the terminal:
 
