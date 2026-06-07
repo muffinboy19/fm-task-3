@@ -1,3 +1,7 @@
+ 
+
+https://github.com/user-attachments/assets/0fb0f936-a08d-4ee7-aab8-239fd6c18411
+
 # Open Source Issue Solver for Go Repositories
 
 <video src="docs/demo.mp4" controls width="100%">
