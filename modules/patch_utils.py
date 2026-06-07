@@ -6,20 +6,26 @@ import re
 import subprocess
 from pathlib import Path
 
-# Placeholder hashes LLMs often invent (git apply may still fail on context)
+# Placeholder hashes LLMs often invent (git apply may still fail on context).
+# 0000000 is excluded — git uses it as the old blob for new files.
 _FAKE_HASH_VALUES = frozenset(
-    f"{d * 7}" for d in "0123456789"
-) | frozenset({"0000000", "1111111", "2222222", "3333333", "4444444"})
+    f"{d * 7}" for d in "123456789"
+) | frozenset({"1111111", "2222222", "3333333", "4444444", "5555555", "6666666", "7777777", "8888888", "9999999"})
 
 
 def _is_fake_index_hash(h: str) -> bool:
     h = h.strip().lower()
+    if h == "0000000":
+        return False
     if h in _FAKE_HASH_VALUES:
         return True
-    # all same hex digit, e.g. aaaaaaa
     if len(h) >= 7 and len(set(h)) == 1:
         return True
     return False
+
+
+def _section_is_new_file(section: str) -> bool:
+    return "--- /dev/null" in section or "new file mode" in section
 
 
 def patch_format_issues(patch: str) -> list[str]:
@@ -35,8 +41,9 @@ def patch_format_issues(patch: str) -> list[str]:
         issues.append("MARKDOWN_FENCE_LEAKED_INTO_PATCH")
 
     for m in re.finditer(r"^index ([0-9a-f]+)\.\.([0-9a-f]+)", patch, re.MULTILINE | re.I):
-        if _is_fake_index_hash(m.group(1)) or _is_fake_index_hash(m.group(2)):
-            issues.append(f"FAKE_INDEX_HASH: index {m.group(1)}..{m.group(2)}")
+        old_h, new_h = m.group(1), m.group(2)
+        if _is_fake_index_hash(new_h) or _is_fake_index_hash(old_h):
+            issues.append(f"FAKE_INDEX_HASH: index {old_h}..{new_h}")
 
     sections = re.split(r"(?=^diff --git )", patch, flags=re.MULTILINE)
     for i, section in enumerate(sections):
@@ -53,20 +60,31 @@ def patch_format_issues(patch: str) -> list[str]:
     return issues
 
 
+_HARD_BLOCK = frozenset({
+    "EMPTY_PATCH",
+    "MISSING_DIFF_GIT_HEADER",
+    "MARKDOWN_FENCE_LEAKED_INTO_PATCH",
+})
+
+
 def patch_applies(diag: dict) -> bool:
-    """True when git apply --check passed and no fake index / missing index issues."""
-    blocking = {
-        "EMPTY_PATCH",
-        "MISSING_DIFF_GIT_HEADER",
-        "MARKDOWN_FENCE_LEAKED_INTO_PATCH",
-        "MISSING_FINAL_NEWLINE",
-    }
-    for issue in diag.get("issues") or []:
-        if issue in blocking or issue.startswith("FAKE_INDEX") or "MISSING_INDEX" in issue:
+    """True when the patch is safe to use (git apply --check is the source of truth)."""
+    issues = diag.get("issues") or []
+    for issue in issues:
+        if issue in _HARD_BLOCK or issue.startswith("GIT_APPLY:"):
             return False
-        if issue.startswith("GIT_APPLY:"):
+
+    if diag.get("git_apply_exit") == 0:
+        return True
+
+    for issue in issues:
+        if issue.startswith("FAKE_INDEX") or "MISSING_INDEX" in issue:
             return False
-    return diag.get("git_apply_exit") == 0
+        if issue == "MISSING_FINAL_NEWLINE":
+            return False
+        if "MISMATCH" in issue or "ENDS_ON_CHANGE_LINE" in issue:
+            return False
+    return False
 
 
 def analyze_patch(patch: str, repo_path: Path) -> dict:
@@ -96,6 +114,7 @@ def analyze_patch(patch: str, repo_path: Path) -> dict:
     for i, section in enumerate(sections):
         if not section.strip():
             continue
+        is_new = _section_is_new_file(section)
         hunks = list(re.finditer(r"^@@ .+ @@", section, re.MULTILINE))
         for j, hunk_m in enumerate(hunks):
             start = hunk_m.end()
@@ -104,26 +123,24 @@ def analyze_patch(patch: str, repo_path: Path) -> dict:
             plus = sum(1 for ln in body if ln.startswith("+") and not ln.startswith("+++"))
             minus = sum(1 for ln in body if ln.startswith("-") and not ln.startswith("---"))
             ctx = sum(1 for ln in body if ln.startswith(" "))
-            # Parse @@ -old,old_len +new,new_len @@
             hdr = hunk_m.group(0)
             m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", hdr)
-            if m:
+            if m and not is_new:
                 old_len = int(m.group(2) or 1)
                 new_len = int(m.group(4) or 1)
                 if minus != old_len:
                     diagnosis["issues"].append(
                         f"HUNK_{i}_{j}_OLD_COUNT_MISMATCH: header says -{old_len} lines, found {minus} '-' lines"
                     )
-                if plus + ctx != new_len and plus != new_len:
-                    # unified diff: new side = context + plus lines
-                    new_side = plus + ctx
-                    if new_side != new_len:
-                        diagnosis["issues"].append(
-                            f"HUNK_{i}_{j}_NEW_COUNT_MISMATCH: header says +{new_len} lines, "
-                            f"found {new_side} on new side ({plus} '+', {ctx} ' ')"
-                        )
+                new_side = plus + ctx
+                if new_side != new_len and plus != new_len:
+                    diagnosis["issues"].append(
+                        f"HUNK_{i}_{j}_NEW_COUNT_MISMATCH: header says +{new_len} lines, "
+                        f"found {new_side} on new side ({plus} '+', {ctx} ' ')"
+                    )
 
-        # Truncated section: ends with + line but no following context / next hunk closed
+        if is_new:
+            continue
         last_line = section.strip().splitlines()[-1] if section.strip() else ""
         if last_line.startswith("+") or last_line.startswith("-"):
             diagnosis["issues"].append(
@@ -186,3 +203,95 @@ def packages_to_test(patch: str) -> list[str]:
         parent = str(Path(path).parent)
         pkgs.add("./" if parent == "." else f"./{parent}")
     return sorted(pkgs) or ["./..."]
+
+
+MAX_PATCH_LINES = 800
+MAX_SINGLE_FILE_LINES = 400
+MAX_FILE_DELETION_RATIO = 0.35
+
+
+def _file_change_stats(patch: str) -> dict[str, dict]:
+    """Per-file added/deleted line counts from unified diff."""
+    stats: dict[str, dict] = {}
+    current_file = ""
+    for line in patch.splitlines():
+        if line.startswith("diff --git"):
+            parts = line.split()
+            if len(parts) >= 4 and parts[3].startswith("b/"):
+                current_file = parts[3][2:]
+                stats.setdefault(current_file, {"adds": 0, "dels": 0})
+            continue
+        if not current_file:
+            continue
+        if line.startswith("+") and not line.startswith("+++"):
+            stats[current_file]["adds"] += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            stats[current_file]["dels"] += 1
+    return stats
+
+
+def patch_integrity_issues(
+    patch: str,
+    issue_type: str = "",
+    require_production_go: bool = True,
+    require_tests: bool = True,
+    repo_path: Path | None = None,
+) -> list[str]:
+    """Static gates before accepting a patch (size, destruction, required files)."""
+    issues: list[str] = []
+    if not patch.strip():
+        return ["EMPTY_PATCH"]
+
+    lines = patch.splitlines()
+    if len(lines) > MAX_PATCH_LINES:
+        issues.append(f"PATCH_TOO_LARGE: {len(lines)} lines (max {MAX_PATCH_LINES})")
+
+    files = patch_files_changed(patch)
+    prod = [f for f in files if f.endswith(".go") and not f.endswith("_test.go")]
+    tests = [f for f in files if f.endswith("_test.go")]
+
+    itype = (issue_type or "").lower()
+    needs_prod = require_production_go and itype not in ("docs", "documentation")
+    needs_tests = require_tests and itype in ("bug", "regression", "defect", "")
+
+    if needs_prod and not prod and files:
+        issues.append("MISSING_PRODUCTION_GO: patch must change at least one non-test .go file")
+    if needs_tests and not tests and prod:
+        issues.append("MISSING_TEST_FILE: bug fixes must include a *_test.go change")
+
+    for path, st in _file_change_stats(patch).items():
+        total = st["adds"] + st["dels"]
+        if total > MAX_SINGLE_FILE_LINES:
+            issues.append(
+                f"FILE_TOO_LARGE: {path} has {total} changed lines (max {MAX_SINGLE_FILE_LINES})"
+            )
+        if st["dels"] > 0 and st["adds"] == 0 and st["dels"] > 50:
+            issues.append(f"FILE_MASS_DELETE: {path} deletes {st['dels']} lines with no additions")
+        if repo_path and st["dels"] > 0:
+            orig = repo_path / path
+            if orig.is_file():
+                try:
+                    file_lines = len(orig.read_text(encoding="utf-8", errors="replace").splitlines())
+                except OSError:
+                    file_lines = 0
+                if file_lines > 0:
+                    ratio = st["dels"] / file_lines
+                    if ratio > MAX_FILE_DELETION_RATIO:
+                        issues.append(
+                            f"FILE_DELETION_RATIO: {path} deletes {ratio:.0%} "
+                            f"(max {MAX_FILE_DELETION_RATIO:.0%})"
+                        )
+
+    return issues
+
+
+def patch_passes_integrity(
+    patch: str,
+    issue_type: str = "",
+    require_production_go: bool = True,
+    require_tests: bool = True,
+    repo_path: Path | None = None,
+) -> bool:
+    return not patch_integrity_issues(
+        patch, issue_type, require_production_go, require_tests, repo_path
+    )

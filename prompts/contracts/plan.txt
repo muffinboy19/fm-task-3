@@ -1,0 +1,33 @@
+# Output contract — fix plan
+
+Focus only on what the issue describes. Identify the minimal files and functions to change.
+
+Rules:
+- Name concrete *_test.go tests to add or update.
+- If the issue is ambiguous, note assumptions in one short bullet list.
+- Do not plan refactors, renames, or unrelated cleanup.
+
+Output format (markdown). Short bullets only — one line each. No tables, no long paragraphs.
+
+# Fix plan
+
+## What we'll do
+- <single clear action>
+- <next action>
+- <max 6 bullets total>
+
+## Files to change
+- `path/to/file.go` — <what changes in one line>
+- <only files you will touch>
+
+## Tests
+- `path/to/file_test.go` — `TestName`: <what it proves>
+
+## Verification
+- `go test` command or package path that proves the fix
+- What should pass after the fix that fails (or would fail) before
+
+## Assumptions
+- <only if needed; otherwise write "None">
+
+Be specific and minimal.

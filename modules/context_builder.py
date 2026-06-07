@@ -15,6 +15,12 @@ from pathlib import Path
 
 from modules.agent_logger import get_logger
 from modules.convention import format_conventions_block
+from modules.repo_hints import (
+    hint_grep_dirs,
+    linter_search_paths,
+    reference_pr_paths,
+    scope_guidance,
+)
 from modules.context_search import (
     anchor_paths,
     curated_grep_terms,
@@ -41,6 +47,9 @@ class ContextBuilder:
         log.kv("code-review-graph available", self._crg_available)
 
         rel_paths = anchor_paths(issue)
+        ref_paths = reference_pr_paths(issue)
+        if ref_paths:
+            rel_paths = list(dict.fromkeys(rel_paths + [p for p in ref_paths if p.endswith(".go")]))
         grep_terms = issue.get("grep_terms") or curated_grep_terms(issue)
         error_strings = curated_error_strings(issue)
 
@@ -48,7 +57,7 @@ class ContextBuilder:
         log.kv("Curated grep terms", grep_terms)
         log.kv("Error strings", error_strings)
 
-        hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings)
+        hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings, issue)
         if not hits:
             alt_terms = fallback_grep_terms(issue)
             if alt_terms:
@@ -56,7 +65,7 @@ class ContextBuilder:
                     f"No files from primary grep; retrying with fallback terms: {alt_terms}"
                 )
                 grep_terms = list(dict.fromkeys(grep_terms + alt_terms))
-                hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings)
+                hits = self._discover_candidate_files(rel_paths, grep_terms, error_strings, issue)
 
         candidate_files = [p for p, _ in hits]
 
@@ -107,10 +116,12 @@ class ContextBuilder:
         rel_paths: list[str],
         grep_terms: list[str],
         error_strings: list[str],
+        issue: dict | None = None,
     ) -> list[tuple[Path, int]]:
         """Return (path, score) ranked highest first."""
         log = get_logger()
         scores: dict[Path, int] = {}
+        issue = issue or {}
 
         def add(path: Path, points: int) -> None:
             if not path.exists() or "vendor" in path.parts:
@@ -126,12 +137,30 @@ class ContextBuilder:
             anchor_dirs.add(p.parent)
             log.debug(f"  path anchor: {p.relative_to(self.repo)}")
 
+        owner = issue.get("owner") or ""
+        repo_name = issue.get("repo") or ""
+        for hint_dir in hint_grep_dirs(self.repo, owner, repo_name):
+            anchor_dirs.add(hint_dir)
+        for linter_path in linter_search_paths(self.repo, owner, repo_name, issue):
+            if linter_path.is_file():
+                add(linter_path, _PATH_ANCHOR_SCORE)
+                anchor_dirs.add(linter_path.parent)
+            elif linter_path.is_dir():
+                for go_file in linter_path.rglob("*.go"):
+                    if "_test.go" not in go_file.name:
+                        add(go_file, _PATH_ANCHOR_SCORE - 10)
+                        anchor_dirs.add(go_file.parent)
+
+        hint_roots = [str(d) for d in hint_grep_dirs(self.repo, owner, repo_name)]
+        search_roots = hint_roots if hint_roots and not anchor_dirs else None
+
         impl_count = lambda: len([p for p in scores if "_test.go" not in p.name])
         if impl_count() < _MAX_IMPL_FILES:
             for path, pts in self._grep_hits(
                 grep_terms,
                 error_strings,
                 search_dirs=anchor_dirs if anchor_dirs else None,
+                extra_roots=search_roots,
             ):
                 add(path, pts)
 
@@ -162,10 +191,13 @@ class ContextBuilder:
         grep_terms: list[str],
         error_strings: list[str],
         search_dirs: set[Path] | None = None,
+        extra_roots: list[str] | None = None,
     ) -> list[tuple[Path, int]]:
         hits: dict[Path, int] = {}
         log = get_logger()
         roots = [str(d) for d in search_dirs] if search_dirs else [str(self.repo)]
+        if extra_roots:
+            roots = list(dict.fromkeys(roots + extra_roots))
 
         for term in grep_terms:
             if len(term) < 3:
@@ -474,7 +506,7 @@ class ContextBuilder:
             f"- **Symptom:** {u.get('symptom', issue.get('title', ''))}\n"
             f"- **Expected:** {u.get('expected', 'unknown')}\n"
             f"- **Actual:** {u.get('actual', 'unknown')}\n",
-            format_conventions_block(conventions),
+            format_conventions_block(conventions, extra_must_follow=scope_guidance(issue)),
         ]
         parts.append("\n## Relevant function bodies\n")
         for fn in functions:

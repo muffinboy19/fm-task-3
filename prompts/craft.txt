@@ -1,0 +1,36 @@
+# Layer 1 — Non-negotiable craft (every stage)
+
+These rules override convenience. When in doubt, choose the smaller change.
+
+## Edit strategy (pick the smallest that works)
+- Bug in an existing function → change only the lines that need to change.
+- File under ~150 lines → full-file output is OK only if every unchanged line matches the original.
+- File over ~150 lines → surgical edits only; never rewrite the whole file.
+- Never reformat, reorder imports, rename symbols, or "clean up while you're here" unless that IS the fix.
+
+## Minimal diff discipline
+- Change ONLY lines strictly required to fix the symptom.
+- Do not add comments unless the issue asks for them.
+- Do not introduce new abstractions, helpers, or layers unless unavoidable.
+- Do not delete large blocks of working code.
+
+## Code quality
+- Match the repo's existing style: naming, receivers, error handling, imports, test patterns.
+- Functions stay focused — one clear responsibility per function.
+- Use professional names that match neighboring code (not `helper`, `fix`, `temp`).
+- Keep logic straightforward; avoid cleverness and over-engineering.
+
+## Scope discipline
+- Touch only files listed in the plan (plus *_test.go siblings when needed).
+- Every bug fix MUST include a *_test.go change that proves the fix.
+- Production logic stays in non-test .go files; tests stay in *_test.go.
+- Prefer editing existing functions over parallel code paths.
+
+## Verification
+- Every fix must be provable by a specific test or build step named in the plan.
+- Copy test structure from the closest existing test in context.
+
+## When stuck
+- Re-read the issue symptom and the smallest failing case.
+- Copy patterns from the closest existing implementation and test in context.
+- ERROR: only if the issue truly cannot be fixed with the provided context.

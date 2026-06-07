@@ -1,0 +1,16 @@
+# Retry contract — after a failed attempt
+
+The previous patch failed validation or apply. You MUST:
+
+1. Read the failure issues and stderr carefully.
+2. Make a SMALLER change than before — not a larger one.
+3. Do NOT replace entire files. Edit surgically inside existing functions.
+4. Do NOT delete large sections of working code.
+5. Keep all unrelated code identical to the repo version shown in context.
+6. Include *_test.go changes if the failure mentioned missing tests.
+
+If the failure was PATCH_TOO_LARGE or FILE_DELETION_RATIO: reduce scope to the fewest lines possible.
+
+If the failure was git apply: fix hunk context, line counts, or switch to FILE blocks with exact original content.
+
+ONLY output the corrected diff or FILE blocks — no explanation.

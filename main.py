@@ -11,7 +11,7 @@ from modules.agent_logger import init_logger, get_logger
 from modules.issue_understanding import IssueUnderstanding
 from modules.context_builder import ContextBuilder
 from modules.code_reasoning_agent import CodeReasoningAgent
-from modules.code_generator import CodeGenerator
+from modules.code_generator import CodeGenerator, MINIMAL_RETRY
 from modules.plan_adherence_checker import PlanAdherenceChecker
 from modules.validator import Validator
 from modules.pr_writer import PRWriter
@@ -250,6 +250,10 @@ def main():
             encoding="utf-8",
         )
         u = issue["understanding"]
+        ref_files_path = output_dir / "reference_pr_files.json"
+        if ref_files_path.exists():
+            issue["reference_pr_files"] = json.loads(ref_files_path.read_text(encoding="utf-8"))
+        issue_type = (u.get("type") or "").lower()
         log.step_ok(
             "1",
             f"{issue['title'][:50]}... | {u.get('type')} | confidence={u.get('confidence')}",
@@ -462,11 +466,13 @@ def main():
                 repo_path=repo_path,
                 full_suite=validation_full,
             )
-            result = validator.validate(patch=patch, plan=plan)
+            result = validator.validate(patch=patch, plan=plan, issue_type=issue_type)
             vr = result.get("validation_report") or {}
             log.kv("Apply passed", vr.get("apply_passed"))
             log.kv("Build passed", vr.get("build_passed"))
             log.kv("Tests passed", vr.get("tests_passed"))
+            if vr.get("integrity_issues"):
+                log.kv("Integrity issues", vr["integrity_issues"][:4])
             if vr.get("test_commands"):
                 log.kv("Test commands", vr["test_commands"])
             log.artifact("Validation report", str(output_dir / "validation_report.json"))
@@ -477,21 +483,30 @@ def main():
                 err = result.get("error") or "validation failed"
                 log.step_warn("6", err[:200])
                 test_out = result.get("test_output") or ""
-                if test_out and "go test" in test_out.lower():
-                    log.info("Regenerating patch after test failure...")
+                build_failed = vr.get("build_passed") is False
+                integrity_failed = bool(vr.get("integrity_issues"))
+                if test_out or build_failed or integrity_failed:
+                    log.info("Regenerating patch after validation failure...")
+                    regen_hint = (
+                        "Go validation failed. Fix the patch so it applies and tests pass.\n\n"
+                        + test_out[-6000:]
+                    )
+                    if build_failed or integrity_failed:
+                        regen_hint = MINIMAL_RETRY + "\n\n" + regen_hint
                     try:
                         regen = generator.regenerate(
                             issue,
                             context,
                             plan,
                             patch,
-                            "Go validation failed. Fix the patch so it applies and tests pass.\n\n"
-                            + test_out[-6000:],
+                            regen_hint,
                         )
                         patch_path.write_text(regen, encoding="utf-8")
                         patch = regen
                         log.diff_summary(patch, str(patch_path))
-                        result = validator.validate(patch=patch, plan=plan)
+                        result = validator.validate(
+                            patch=patch, plan=plan, issue_type=issue_type
+                        )
                         if result["passed"]:
                             log.step_ok("6", "Tests pass after regeneration")
                         else:
@@ -514,13 +529,18 @@ def main():
 
     result["plan_aligned"] = plan_aligned
     result["final_patch"] = patch
+    validation_passed = result.get("validation_passed") is True
+    overall_passed = validation_passed and plan_aligned
+    result["passed"] = overall_passed if not dry_run else result.get("passed")
+    result["validation_passed"] = validation_passed
 
     if args.stop_after and args.stop_after <= 6:
         summary = {
             "issue": issue["url"],
             "title": issue["title"],
             "plan_aligned": plan_aligned,
-            "validation_passed": result.get("validation_passed"),
+            "validation_passed": validation_passed,
+            "overall_passed": overall_passed,
             "patch": str(patch_path),
             "plan": str(output_dir / "plan.md"),
             "plan_check": str(output_dir / "plan_check.json"),
@@ -530,13 +550,17 @@ def main():
         (output_dir / "run_summary.json").write_text(
             json.dumps(summary, indent=2), encoding="utf-8"
         )
-        passed = result.get("passed") is True
-        log.finalize(success=passed if not dry_run else True, summary=summary)
+        passed = overall_passed if not dry_run else True
+        log.finalize(success=passed, summary=summary)
         return
 
-    validation_ok = result.get("validation_passed") is True
-    if not dry_run and result.get("validation_passed") is False:
-        log.step_start("7", "Writing PR summary (validation failed — draft only)...")
+    if not dry_run and (not validation_passed or not plan_aligned):
+        reason = []
+        if not validation_passed:
+            reason.append("validation failed")
+        if not plan_aligned:
+            reason.append("plan not aligned")
+        log.step_start("7", f"Writing PR summary ({', '.join(reason)} — draft only)...")
         pr_path = output_dir / "pr_summary.md"
         pr = build_draft_pr_summary(issue, plan, result)
         pr_path.write_text(pr, encoding="utf-8")
@@ -564,7 +588,8 @@ def main():
         "title": issue["title"],
         "repo": str(repo_path) if repo_path else None,
         "plan_aligned": plan_aligned,
-        "validation_passed": result.get("validation_passed"),
+        "validation_passed": validation_passed,
+        "overall_passed": overall_passed,
         "patch": str(patch_path),
         "plan": str(output_dir / "plan.md"),
         "plan_check": str(output_dir / "plan_check.json"),
@@ -574,7 +599,7 @@ def main():
     }
     (output_dir / "run_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    success = validation_ok or (dry_run and result.get("validation_passed") is None)
+    success = overall_passed or (dry_run and result.get("validation_passed") is None)
     log.finalize(success=success, summary=summary)
 
 

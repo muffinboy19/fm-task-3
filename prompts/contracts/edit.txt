@@ -1,0 +1,25 @@
+# Output contract — FILE blocks (search/replace style)
+
+Output complete updated files using FILE blocks. The harness exports a real git diff.
+
+Format (repeat per changed file):
+
+FILE: path/relative/to/repo/root.go
+```go
+package foo
+
+// full file content
+```
+
+Rules (Aider-style surgical edits):
+- Paths relative to repo root (e.g. `render/json.go`).
+- When a current file is provided: keep every unchanged line identical to the original.
+  Change ONLY the region required by the fix — do not reformat, reorder, or rewrite unrelated code.
+- For files over ~150 lines: touch one function or branch; leave the rest byte-for-byte the same.
+- Prefer several small logical changes over one massive rewrite.
+- Include at least one *_test.go file with tests that prove the fix.
+- New files must be complete and compile.
+
+If you cannot implement the fix: ERROR: <reason>
+
+ONLY EVER RETURN FILE: blocks — no discussion before or after.

@@ -12,12 +12,27 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from modules.llm import LLMClient, load_prompt, extract_unified_diff
-from modules.patch_utils import analyze_patch, patch_applies, patch_includes_tests
+from modules.llm import LLMClient, extract_unified_diff
+from modules.patch_utils import (
+    analyze_patch,
+    patch_applies,
+    patch_includes_tests,
+    patch_integrity_issues,
+    patch_passes_integrity,
+)
 from modules.git_patch import apply_edits_and_diff, parse_file_edits
 from modules.agent_logger import get_logger
 from modules.repo_resolver import default_output_dir, effective_repo_path
-from modules.convention import format_conventions_block
+from modules.convention import format_conventions_block, build_system_prompt
+from modules.repo_hints import scope_guidance
+
+
+MINIMAL_RETRY = (
+    "\n\nCRITICAL: Previous patch was too large or rewrote whole files. "
+    "Make the SMALLEST possible change — a few lines in existing functions only. "
+    "Do NOT replace entire files. Do NOT delete large sections. "
+    "Edit surgically; keep all unrelated code identical."
+)
 
 
 class CodeGenerator:
@@ -65,7 +80,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
             context,
             plan,
             module="code_generator_retry",
-            user_extra=user_extra,
+            user_extra=user_extra + MINIMAL_RETRY,
             prefer_edit_mode=True,
         )
 
@@ -85,6 +100,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
         feedback = user_extra
         last_patch = ""
         last_diag: dict = {}
+        issue_type = (issue.get("understanding") or {}).get("type", "")
 
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
             use_edit = prefer_edit_mode or attempt >= 3
@@ -101,7 +117,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
                         issue, context, plan, module, feedback, attempt
                     )
                 else:
-                    raw = self._llm_diff_raw(issue, context, plan, module, feedback)
+                    raw = self._llm_diff_raw(issue, context, plan, module, feedback, attempt)
                     patch = self._normalize_patch(extract_unified_diff(raw))
             except RuntimeError as e:
                 log.warning(f"Attempt {attempt} error: {e}")
@@ -121,28 +137,46 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
             if diag.get("issues"):
                 log.warning(f"Patch diagnosis: {diag['issues'][:6]}")
 
+            integrity = patch_integrity_issues(
+                patch, issue_type=issue_type, repo_path=self.repo_path
+            )
+            if integrity:
+                log.warning(f"Patch integrity: {integrity[:4]}")
+                diag["integrity_issues"] = integrity
+                feedback = self._format_retry_feedback(diag, patch, integrity)
+                log.warning(f"Attempt {attempt} failed integrity check — retrying")
+                continue
+
             diag_path = out_dir / f"{module}_diagnosis.json"
             if attempt > 1:
                 diag_path = out_dir / f"{module}_attempt{attempt}_diagnosis.json"
             diag_path.write_text(json.dumps({**diag, "attempt": attempt, "mode": mode}, indent=2), encoding="utf-8")
 
-            if patch_applies(diag):
-                log.info("Patch passes git apply --check")
+            if patch_applies(diag) and patch_passes_integrity(
+                patch, issue_type=issue_type, repo_path=self.repo_path
+            ):
+                log.info("Patch passes apply + integrity checks")
                 if not patch_includes_tests(patch):
                     log.warning("Patch has no *_test.go changes")
                 return patch
 
-            feedback = self._format_retry_feedback(diag, patch)
+            feedback = self._format_retry_feedback(diag, patch, integrity)
             log.warning(f"Attempt {attempt} failed apply check — retrying")
 
         log.warning("All patch attempts failed apply check; returning last patch")
         return last_patch
 
     def _llm_diff_raw(
-        self, issue: dict, context: dict, plan: str, module: str, user_extra: str
+        self,
+        issue: dict,
+        context: dict,
+        plan: str,
+        module: str,
+        user_extra: str,
+        attempt: int = 1,
     ) -> str:
         log = get_logger()
-        system = load_prompt("generate.txt")
+        system = build_system_prompt("generate", include_retry=attempt > 1)
         user = self._build_diff_user_prompt(issue, context, plan) + user_extra
         raw = self.llm.complete(system=system, user=user, max_tokens=self.MAX_TOKENS, module=module)
         log.info(f"Raw LLM diff response ({len(raw)} chars)")
@@ -158,7 +192,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
         attempt: int,
     ) -> tuple[str, str]:
         log = get_logger()
-        system = load_prompt("generate_edit.txt")
+        system = build_system_prompt("generate_edit", include_retry=attempt > 1)
         user = self._build_edit_user_prompt(issue, context, plan) + user_extra
         raw = self.llm.complete(
             system=system,
@@ -198,6 +232,12 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
                 contents[rel] = p.read_text(encoding="utf-8", errors="replace")
         return contents
 
+    def _conventions_for_issue(self, issue: dict, context: dict) -> str:
+        return format_conventions_block(
+            context.get("convention_snapshot", ""),
+            extra_must_follow=scope_guidance(issue),
+        )
+
     def _build_diff_user_prompt(self, issue: dict, context: dict, plan: str) -> str:
         return f"""## Issue
 **{issue['title']}** ({issue['url']})
@@ -207,7 +247,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
 ## Fix plan
 {plan}
 
-{format_conventions_block(context.get("convention_snapshot", ""))}
+{self._conventions_for_issue(issue, context)}
 
 ## Code context
 {context['raw_context_str']}
@@ -215,6 +255,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
 Generate the unified diff now.
 
 REQUIRED:
+- Minimal surgical diff only — change the fewest lines possible.
 - Include changes to at least one *_test.go file with tests that verify the fix.
 - Use real context from the repo — do NOT use placeholder index hashes like 1111111.
 - Every `diff --git` section MUST include an `index <hash>..<hash> 100644` line.
@@ -236,7 +277,7 @@ REQUIRED:
 ## Fix plan
 {plan}
 
-{format_conventions_block(context.get("convention_snapshot", ""))}
+{self._conventions_for_issue(issue, context)}
 
 ## Files to change (from plan)
 {', '.join(paths) or 'see plan'}
@@ -248,10 +289,13 @@ REQUIRED:
 
 Output complete updated files using FILE: path blocks.
 Include at least one *_test.go file with tests that verify the fix.
+Keep each file as close to the original as possible — minimal edits only.
 """
 
-    def _format_retry_feedback(self, diag: dict, patch: str) -> str:
-        issues = diag.get("issues") or []
+    def _format_retry_feedback(
+        self, diag: dict, patch: str, integrity: list[str] | None = None
+    ) -> str:
+        issues = list(diag.get("issues") or []) + list(integrity or [])
         stderr = diag.get("git_apply_stderr") or ""
         return f"""
 
@@ -271,6 +315,8 @@ Previous patch (truncated):
 ```diff
 {patch[:8000]}
 ```
+
+{MINIMAL_RETRY}
 
 Use FILE: blocks with complete file contents so we can export a real git diff.
 """

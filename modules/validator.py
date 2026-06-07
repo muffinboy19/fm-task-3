@@ -12,6 +12,7 @@ from modules.patch_utils import (
     packages_to_test,
     patch_files_changed,
     patch_includes_tests,
+    patch_integrity_issues,
     patch_touches_go,
 )
 from modules.repo_resolver import default_output_dir
@@ -49,12 +50,17 @@ class Validator:
             "yes",
         )
 
-    def validate(self, patch: str, plan: str = "") -> dict:
+    def validate(self, patch: str, plan: str = "", issue_type: str = "") -> dict:
         log = get_logger()
         files_changed = patch_files_changed(patch)
         pkgs = packages_to_test(patch)
         plan_tests = extract_test_names_from_plan(plan)
         has_go = patch_touches_go(patch)
+        integrity = patch_integrity_issues(
+            patch,
+            issue_type=issue_type,
+            repo_path=self.repo_path,
+        )
 
         report: dict = {
             "check_type": "go_validation",
@@ -64,6 +70,7 @@ class Validator:
             "packages": pkgs,
             "patch_has_tests": patch_includes_tests(patch),
             "plan_test_names": plan_tests,
+            "integrity_issues": integrity,
             "tiers_run": [],
             "apply_passed": False,
             "build_passed": None,
@@ -77,6 +84,13 @@ class Validator:
         if not patch.strip():
             report["error"] = "EMPTY_PATCH"
             self._write_report(report)
+            return self._result(report, patch)
+
+        if integrity:
+            report["error"] = "; ".join(integrity[:4])
+            report["tiers_run"].append("A_integrity")
+            self._write_report(report)
+            log.warning(f"Patch integrity failed: {integrity[:4]}")
             return self._result(report, patch)
 
         report["tiers_run"].append("A_apply_check")

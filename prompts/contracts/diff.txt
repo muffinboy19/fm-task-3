@@ -1,0 +1,22 @@
+# Output contract — unified diff
+
+Output ONLY a valid unified diff (git diff format) applicable with `git apply`.
+
+Paths: relative to repo root — `diff --git a/render/foo.go b/render/foo.go`
+
+Required:
+- Include changes to at least one *_test.go file that proves the fix.
+- Tests must reproduce the bug or assert correct behavior.
+
+CRITICAL for valid patches:
+- Every hunk MUST end with at least 3 unchanged context lines (space prefix) after the last + or - line.
+- The @@ -old,count +new,count @@ numbers MUST exactly match the +/- lines in that hunk.
+- Never stop mid-hunk. Never start a new "diff --git" until the previous hunk is complete.
+- End the full diff after the last context lines of the last hunk (no truncation).
+- Use real index hashes from context — not placeholders like 1111111.
+
+Wrap the diff in ```diff fences.
+
+If you cannot produce a valid diff: ERROR: <reason>
+
+ONLY EVER RETURN THE DIFF — no discussion before or after.
