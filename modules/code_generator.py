@@ -148,6 +148,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
                 issue_type=issue_type,
                 repo_path=self.repo_path,
                 required_files=required_prod,
+                plan=plan,
             )
             if integrity:
                 log.warning(f"Patch integrity: {integrity[:4]}")
@@ -166,6 +167,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
                 issue_type=issue_type,
                 repo_path=self.repo_path,
                 required_files=required_prod,
+                plan=plan,
             ):
                 log.info("Patch passes apply + integrity checks")
                 if not patch_includes_tests(patch):

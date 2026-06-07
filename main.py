@@ -461,6 +461,7 @@ def main():
         result["test_output"] = "dry-run"
     else:
         log.step_start("6", "git apply + go build + scoped go test...")
+        patch_before_validation = patch
         try:
             validator = Validator(
                 repo_path=repo_path,
@@ -526,6 +527,20 @@ def main():
                 "test_output": str(e),
                 "error": str(e),
             }
+
+        patch = result.get("final_patch") or patch
+        if patch != patch_before_validation or (
+            result.get("validation_passed") and not plan_aligned
+        ):
+            log.info("Re-checking plan adherence on final patch...")
+            try:
+                plan_check_result = PlanAdherenceChecker(api_key=api_key).check(
+                    plan=plan, patch=patch
+                )
+                plan_aligned = bool(plan_check_result.get("plan_aligned"))
+                log.kv("Plan aligned (final)", plan_aligned)
+            except Exception as e:
+                log.warning(f"Final plan check failed: {e}")
 
     result["plan_aligned"] = plan_aligned
     result["final_patch"] = patch

@@ -208,6 +208,7 @@ def packages_to_test(patch: str) -> list[str]:
 MAX_PATCH_LINES = 800
 MAX_SINGLE_FILE_LINES = 400
 MAX_FILE_DELETION_RATIO = 0.35
+MAX_FULL_FILE_LINES = 400
 
 
 def planned_files_from_plan(plan: str) -> list[str]:
@@ -226,6 +227,126 @@ def planned_files_from_plan(plan: str) -> list[str]:
 
 def planned_production_files(plan: str) -> list[str]:
     return [p for p in planned_files_from_plan(plan) if not p.endswith("_test.go")]
+
+
+def planned_test_files(plan: str) -> list[str]:
+    return [p for p in planned_files_from_plan(plan) if p.endswith("_test.go")]
+
+
+def plan_allows_test_only(plan: str) -> bool:
+    return bool(
+        re.search(
+            r"only (?:the )?regression test|only test additions|if so, only|already contain",
+            plan,
+            re.I,
+        )
+    )
+
+
+def planned_prod_fix_redundant(plan: str, repo_path: Path | None) -> bool:
+    """True when repo already has the planned production change (tests-only patch OK)."""
+    if not repo_path or not plan:
+        return False
+    for path, syms in planned_symbols_by_file(plan).items():
+        if path.endswith("_test.go") or "cronRegexString" not in syms:
+            continue
+        p = repo_path / path
+        if not p.is_file():
+            continue
+        try:
+            content = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "/,#L-" in content or "[A-Za-z0-9*?][A-Za-z0-9*?/,#L-]" in content:
+            return True
+    return False
+
+
+def planned_symbols_by_file(plan: str) -> dict[str, list[str]]:
+    """Symbols the plan says to modify per file (from Files to change + Tests)."""
+    by_file: dict[str, set[str]] = {}
+
+    def add(path: str, sym: str) -> None:
+        if path and sym and not sym.endswith(".go"):
+            by_file.setdefault(path, set()).add(sym)
+
+    section = re.search(r"## Files to change\s*\n(.*?)(?:\n## |\Z)", plan, re.DOTALL | re.I)
+    for line in (section.group(1) if section else plan).splitlines():
+        m = re.match(r"^-\s*`([^`]+\.go)`\s*—", line)
+        if not m:
+            continue
+        path = m.group(1)
+        tail = line.split("—", 1)[-1]
+        for sym in re.findall(r"`(\w+)`", tail):
+            add(path, sym)
+
+    tests_sec = re.search(r"## Tests\s*\n(.*?)(?:\n## |\Z)", plan, re.DOTALL | re.I)
+    if tests_sec:
+        for line in tests_sec.group(1).splitlines():
+            m = re.match(r"^-\s*`([^`]+\.go)`\s*—\s*`(Test\w+)`", line)
+            if m:
+                add(m.group(1), m.group(2))
+
+    return {k: sorted(v) for k, v in by_file.items()}
+
+
+def _patch_file_sections(patch: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    current = ""
+    buf: list[str] = []
+    for line in patch.splitlines():
+        if line.startswith("diff --git"):
+            if current:
+                sections[current] = "\n".join(buf)
+            parts = line.split()
+            current = parts[3][2:] if len(parts) >= 4 and parts[3].startswith("b/") else ""
+            buf = [line]
+        else:
+            buf.append(line)
+    if current:
+        sections[current] = "\n".join(buf)
+    return sections
+
+
+def planned_test_files_required(plan: str, repo_path: Path | None = None) -> list[str]:
+    """Planned test files we can require verbatim (skip huge files that use append/new file)."""
+    required: list[str] = []
+    for f in planned_test_files(plan):
+        if repo_path:
+            p = repo_path / f
+            if p.is_file():
+                try:
+                    if len(p.read_text(encoding="utf-8", errors="replace").splitlines()) > MAX_FULL_FILE_LINES:
+                        continue
+                except OSError:
+                    pass
+        required.append(f)
+    return required
+
+
+def patch_planned_symbol_issues(patch: str, plan: str) -> list[str]:
+    """Ensure +/- lines in a file mention symbols the plan assigned to that file."""
+    issues: list[str] = []
+    symbols = planned_symbols_by_file(plan)
+    if not symbols:
+        return issues
+    sections = _patch_file_sections(patch)
+    changed = set(patch_files_changed(patch))
+    for path, syms in symbols.items():
+        if path not in changed:
+            continue
+        body = sections.get(path, "")
+        delta = "\n".join(
+            ln[1:]
+            for ln in body.splitlines()
+            if (ln.startswith("+") or ln.startswith("-"))
+            and not ln.startswith("+++")
+            and not ln.startswith("---")
+        )
+        for sym in syms:
+            if sym not in delta:
+                issues.append(f"PLANNED_SYMBOL_NOT_TOUCHED: {path} must modify `{sym}`")
+    return issues
 
 
 def _file_change_stats(patch: str) -> dict[str, dict]:
@@ -255,6 +376,7 @@ def patch_integrity_issues(
     require_tests: bool = True,
     repo_path: Path | None = None,
     required_files: list[str] | None = None,
+    plan: str = "",
 ) -> list[str]:
     """Static gates before accepting a patch (size, destruction, required files)."""
     issues: list[str] = []
@@ -270,18 +392,34 @@ def patch_integrity_issues(
     tests = [f for f in files if f.endswith("_test.go")]
 
     itype = (issue_type or "").lower()
-    needs_prod = require_production_go and itype not in ("docs", "documentation")
+    test_only = bool(
+        plan and (plan_allows_test_only(plan) or planned_prod_fix_redundant(plan, repo_path))
+    )
+    needs_prod = require_production_go and itype not in ("docs", "documentation") and not test_only
     needs_tests = require_tests and itype in ("bug", "regression", "defect", "")
 
     if needs_prod and not prod and files:
         issues.append("MISSING_PRODUCTION_GO: patch must change at least one non-test .go file")
-    if needs_tests and not tests and prod:
+    if needs_tests and not tests:
         issues.append("MISSING_TEST_FILE: bug fixes must include a *_test.go change")
 
     changed = set(files)
-    for req in required_files or []:
+    req_prod = [] if test_only else list(required_files or [])
+    for req in req_prod:
         if req not in changed:
             issues.append(f"MISSING_PLANNED_FILE: {req}")
+
+    for tf in planned_test_files_required(plan, repo_path) if plan else []:
+        if tf not in changed:
+            issues.append(f"MISSING_PLANNED_TEST_FILE: {tf}")
+
+    # Skip symbol checks on files not in patch (e.g. test-only when prod already fixed)
+    symbol_issues = patch_planned_symbol_issues(patch, plan) if plan else []
+    if test_only:
+        symbol_issues = [
+            i for i in symbol_issues if not i.startswith("PLANNED_SYMBOL_NOT_TOUCHED: regexes.go")
+        ]
+    issues.extend(symbol_issues)
 
     for path, st in _file_change_stats(patch).items():
         total = st["adds"] + st["dels"]
@@ -316,7 +454,8 @@ def patch_passes_integrity(
     require_tests: bool = True,
     repo_path: Path | None = None,
     required_files: list[str] | None = None,
+    plan: str = "",
 ) -> bool:
     return not patch_integrity_issues(
-        patch, issue_type, require_production_go, require_tests, repo_path, required_files
+        patch, issue_type, require_production_go, require_tests, repo_path, required_files, plan
     )

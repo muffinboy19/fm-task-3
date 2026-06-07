@@ -32,7 +32,8 @@ def extract_test_names_from_plan(plan: str) -> list[str]:
 
 
 def build_go_test_run_pattern(test_names: list[str]) -> str:
-    parts = [re.escape(n) for n in test_names]
+    """Exact test name match — avoid prefix false positives (TestFoo vs TestFooBar)."""
+    parts = [rf"^{re.escape(n)}$" for n in test_names]
     return "|".join(parts)
 
 
@@ -62,6 +63,7 @@ class Validator:
             issue_type=issue_type,
             repo_path=self.repo_path,
             required_files=planned_production_files(plan) if plan else [],
+            plan=plan,
         )
 
         report: dict = {

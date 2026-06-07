@@ -26,49 +26,37 @@
       "repo": "gin-gonic/gin",
       "url": "https://github.com/gin-gonic/gin/issues/4688",
       "title": "AsciiJSON non-BMP malformed \\u escapes",
-      "size": "small",
-      "status": "eval_pass",
-      "notes": "Run 2: full pass — render/json.go matches PR #4627"
+      "size": "small"
     },
     {
       "repo": "gin-gonic/gin",
       "url": "https://github.com/gin-gonic/gin/issues/4645",
       "title": "Hijack/CloseNotify panic when wrapper unsupported",
-      "size": "small",
-      "status": "eval_pass_apply_only",
-      "notes": "Run 2: apply+tests pass via edit→git diff; only test file changed, missing response_writer.go fix"
+      "size": "small"
     },
     {
       "repo": "gin-gonic/gin",
       "url": "https://github.com/gin-gonic/gin/issues/4535",
       "title": "tree panic findCaseInsensitivePathRec",
-      "size": "medium",
-      "status": "eval_fail_build",
-      "notes": "Run 2: edit mode truncated tree.go; go build caught it"
+      "size": "medium"
     },
     {
       "repo": "gin-gonic/gin",
       "url": "https://github.com/gin-gonic/gin/issues/4422",
       "title": "RunFd os.File resource leak",
-      "size": "small",
-      "status": "eval_abort",
-      "notes": "Run 2: step 3 Cursor API error — re-run needed"
+      "size": "small"
     },
     {
       "repo": "go-playground/validator",
       "url": "https://github.com/go-playground/validator/issues/1561",
       "title": "hostname_rfc1123: reject invalid IPv4-looking hostnames",
-      "size": "small",
-      "status": "validated_by_agent",
-      "notes": "277.168.0.1 should fail; RFC1123 dotted-decimal hostnames invalid"
+      "size": "small"
     },
     {
       "repo": "spf13/cobra",
       "url": "https://github.com/spf13/cobra/issues/2358",
       "title": "Single-hyphen long flags mistreated (-name vs --name)",
-      "size": "medium",
-      "status": "validated_by_agent",
-      "notes": "Flag parsing; may touch pflag integration — run after validator"
+      "size": "medium"
     }
   ],
   "avoid_examples": [
