@@ -1,5 +1,9 @@
 # Open Source Issue Solver for Go Repositories
 
+<video src="docs/demo.mp4" controls width="100%">
+  <a href="docs/demo.mp4">Watch the demo</a>
+</video>
+
 Agent that reads a GitHub issue from an open-source Go repo, plans and generates a fix, validates the patch against the plan, and writes a PR summary — for gin, cobra, validator, golangci-lint, and similar projects.
 
 ## Architecture
