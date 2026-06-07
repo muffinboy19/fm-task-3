@@ -118,6 +118,77 @@ body {
   align-items: center;
 }
 
+.launcher {
+  margin: 12px 12px 0;
+}
+
+.launcher-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 10px;
+}
+
+.launcher-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 220px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.launcher-field input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.launcher-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: #58a6ff22;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.job-status {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+}
+
+.job-status.run { color: var(--run); }
+.job-status.err { color: var(--fail); }
+
 .layout {
   display: grid;
   grid-template-columns: 220px 1fr 260px;

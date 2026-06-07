@@ -6,7 +6,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from modules.config import get_env, get_gemini_api_keys, get_cursor_api_key, get_llm_provider
+from modules.config import get_env, get_gemini_api_keys, get_cursor_api_key, get_llm_provider, ensure_llm_ready
 from modules.agent_logger import init_logger, get_logger
 from modules.issue_understanding import IssueUnderstanding
 from modules.context_builder import ContextBuilder
@@ -153,10 +153,20 @@ def main():
             print(f"  {item['repo']}: {item['reason']}")
         return
 
-    issue_url = args.issue or get_env("GITHUB_ISSUE_URL")
+    if args.issue is None:
+        from modules.dashboard_server import run_serve_mode
+
+        try:
+            ensure_llm_ready()
+        except RuntimeError as e:
+            print(f"LLM setup error:\n{e}")
+            sys.exit(1)
+        run_serve_mode(port=args.ui_port, open_browser=not args.no_ui)
+        return
+
+    issue_url = args.issue
     explicit_repo = args.repo or None
-    if args.issue:
-        os.environ["GITHUB_ISSUE_URL"] = args.issue
+    os.environ["GITHUB_ISSUE_URL"] = args.issue
     output_dir = Path(args.output or get_env("OUTPUT_DIR", "./output")).resolve()
     log_dir = Path(args.log_dir or get_env("LOG_DIR", "./logs")).resolve()
     os.environ["OUTPUT_DIR"] = str(output_dir)
@@ -187,13 +197,14 @@ def main():
     log.kv("LLM provider", get_llm_provider())
     log.kv("Dry run", dry_run)
 
-    if not issue_url:
-        log.step_fail("1", "Missing issue URL (GITHUB_ISSUE_URL or --issue)")
-        sys.exit(1)
-
     provider = get_llm_provider()
     needs_llm = not args.no_llm_intake or not (args.stop_after and args.stop_after <= 1)
     if needs_llm:
+        try:
+            ensure_llm_ready(provider)
+        except RuntimeError as e:
+            log.error(str(e))
+            sys.exit(1)
         if provider == "cursor" and not api_key and not get_cursor_api_key():
             log.error("Missing CURSOR_API_KEY")
             sys.exit(1)

@@ -98,9 +98,18 @@ def clear_stale_run_outputs(output_dir: Path) -> None:
     """Remove artifacts from previous runs so the dashboard starts empty."""
     output_dir = Path(output_dir)
     for name in _STALE_RUN_FILES:
-        path = output_dir / name
-        if path.is_file():
-            path.unlink(missing_ok=True)
+        (output_dir / name).unlink(missing_ok=True)
+    for path in output_dir.glob("code_generator_attempt*_raw.txt"):
+        path.unlink(missing_ok=True)
+    for path in output_dir.glob("code_generator_attempt*_diagnosis.json"):
+        path.unlink(missing_ok=True)
+
+
+def clear_dashboard_state(log_dir: Path, output_dir: Path) -> None:
+    """Wipe prior run artifacts and live snapshot so the UI starts fresh."""
+    clear_stale_run_outputs(output_dir)
+    log_dir = Path(log_dir)
+    (log_dir / "live_state.json").unlink(missing_ok=True)
 
 
 def _step_status(steps: list, step_id: str) -> str:
@@ -138,21 +147,24 @@ def build_live_payload(
     output_dir = Path(output_dir)
     log_dir = Path(log_dir)
 
-    latest_log = Path(current_log_path) if current_log_path else log_dir / "latest.log"
-    if not latest_log.is_file():
-        agents = sorted(log_dir.glob("agent_*.log"), key=lambda p: p.stat().st_mtime)
-        latest_log = agents[-1] if agents else latest_log
-
-    log_tail = ""
-    if latest_log.is_file():
-        try:
-            lines = latest_log.read_text(encoding="utf-8", errors="replace").splitlines()
-            log_tail = "\n".join(lines[-log_tail_lines:])
-        except OSError:
-            pass
-
     steps = logger_snapshot.get("steps", [])
     any_running = any(s.get("status") == "running" for s in steps)
+    has_run = bool(steps) or logger_snapshot.get("success") is not None
+
+    log_tail = ""
+    log_path_str = ""
+    if has_run:
+        latest_log = Path(current_log_path) if current_log_path else log_dir / "latest.log"
+        if not latest_log.is_file():
+            agents = sorted(log_dir.glob("agent_*.log"), key=lambda p: p.stat().st_mtime)
+            latest_log = agents[-1] if agents else latest_log
+        if latest_log.is_file():
+            log_path_str = str(latest_log)
+            try:
+                lines = latest_log.read_text(encoding="utf-8", errors="replace").splitlines()
+                log_tail = "\n".join(lines[-log_tail_lines:])
+            except OSError:
+                pass
 
     issue_raw = (
         _read_json(output_dir / "issue_raw.json")
@@ -206,7 +218,7 @@ def build_live_payload(
         "steps": steps,
         "events": logger_snapshot.get("events", []),
         "artifacts": logger_snapshot.get("artifacts", []),
-        "log_path": str(latest_log) if latest_log.is_file() else "",
+        "log_path": log_path_str,
         "log_tail": log_tail,
         "output_dir": str(output_dir.resolve()),
         "log_dir": str(log_dir.resolve()),

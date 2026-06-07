@@ -130,7 +130,7 @@ If validation failed, it writes a **draft** warning you not to merge yet.
 The robot’s “brain” is an LLM (default: Cursor `composer-2.5`, or Gemini).
 
 Config lives in `.env`:
-- `GITHUB_ISSUE_URL` — which issue to fix
+- `GITHUB_ISSUE_URL` — optional; only used with `python main.py --issue …`
 - `CURSOR_API_KEY` or `GEMINI_API_KEY`
 - `TEST_REPO_DIR` — where clones go (default `test_repo`)
 
@@ -140,10 +140,16 @@ Config lives in `.env`:
 
 ```bash
 source .venv/bin/activate
-python main.py --issue https://github.com/owner/repo/issues/123
+python main.py
 ```
 
-Optional: open `http://127.0.0.1:8765/` to watch the dashboard while it runs.
+Opens the local UI at `http://127.0.0.1:8765/` — paste an issue URL, click Run, watch the pipeline live.
+
+Or run one issue from the terminal:
+
+```bash
+python main.py --issue https://github.com/owner/repo/issues/123
+```
 
 ---
 

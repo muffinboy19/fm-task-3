@@ -4,6 +4,7 @@ let lastPayload = null;
 let clientElapsedBase = 0;
 let clientElapsedAt = 0;
 let elapsedTicker = null;
+let lastJob = null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -65,6 +66,25 @@ function updateLogTail(text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function emptyPayload() {
+  return {
+    updated_at: new Date().toISOString(),
+    elapsed_sec: 0,
+    any_running: false,
+    success: null,
+    steps: [],
+    events: [],
+    artifacts: [],
+    log_tail: "",
+    files: {},
+  };
+}
+
+function clearDisplay() {
+  lastUpdated = "";
+  applyPayload(emptyPayload());
+}
+
 function applyPayload(data) {
   lastPayload = data;
   $("#clock").textContent = new Date(data.updated_at).toLocaleTimeString();
@@ -90,6 +110,7 @@ function applyPayload(data) {
   renderValidation(f, data.steps);
 
   updateLogTail(data.log_tail);
+  if (data.job) updateJobUi(data.job);
 }
 
 function renderEvents(events) {
@@ -398,6 +419,102 @@ setInterval(() => {
   else $("#poll-ago").textContent = `${Math.floor(ago / 60)}m ago`;
 }, 1000);
 
+function updateJobUi(job) {
+  lastJob = job;
+  const el = $("#job-status");
+  const retryBtn = $("#retry-run");
+  const runBtn = $("#run-issue");
+  if (!el) return;
+  if (job.running) {
+    el.textContent = `Running: ${job.current_issue || "…"}`;
+    el.className = "job-status run";
+    if (retryBtn) retryBtn.disabled = true;
+    if (runBtn) runBtn.disabled = true;
+  } else if (job.last_issue) {
+    const exit = job.exit_code != null ? ` (exit ${job.exit_code})` : "";
+    el.textContent = `Done · ${job.last_issue}${exit}`;
+    el.className = "job-status muted";
+    if (retryBtn) retryBtn.disabled = false;
+    if (runBtn) runBtn.disabled = false;
+  } else {
+    el.textContent = "Paste an issue URL and click Run.";
+    el.className = "job-status muted";
+    if (retryBtn) retryBtn.disabled = true;
+    if (runBtn) runBtn.disabled = false;
+  }
+}
+
+async function postJson(url, body = {}) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function runIssue() {
+  const url = $("#issue-input")?.value?.trim();
+  if (!url) {
+    $("#job-status").textContent = "Enter an issue URL first";
+    $("#job-status").className = "job-status err";
+    return;
+  }
+  clearDisplay();
+  try {
+    const job = await postJson("/api/run", { issue_url: url });
+    updateJobUi(job);
+  } catch (e) {
+    $("#job-status").textContent = String(e.message || e);
+    $("#job-status").className = "job-status err";
+  }
+}
+
+async function retryRun() {
+  clearDisplay();
+  try {
+    const job = await postJson("/api/retry");
+    updateJobUi(job);
+  } catch (e) {
+    $("#job-status").textContent = String(e.message || e);
+    $("#job-status").className = "job-status err";
+  }
+}
+
+async function resetForm() {
+  const input = $("#issue-input");
+  if (input) input.value = "";
+  input?.focus();
+  if (lastJob?.running) return;
+  try {
+    await postJson("/api/reset");
+  } catch (_) {
+    /* ignore if reset blocked */
+  }
+  clearDisplay();
+  fetch("/api/job", { cache: "no-store" })
+    .then((r) => r.json())
+    .then(updateJobUi)
+    .catch(() => {});
+}
+
+function setupLauncher() {
+  $("#run-issue")?.addEventListener("click", runIssue);
+  $("#issue-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runIssue();
+  });
+  $("#retry-run")?.addEventListener("click", retryRun);
+  $("#new-issue")?.addEventListener("click", resetForm);
+  clearDisplay();
+  fetch("/api/job", { cache: "no-store" })
+    .then((r) => r.json())
+    .then(updateJobUi)
+    .catch(() => {});
+}
+
 setupTabs();
+setupLauncher();
 poll();
 setInterval(poll, POLL_MS);

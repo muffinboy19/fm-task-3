@@ -8,7 +8,13 @@ Visual UI for the Open Source Issue Solver pipeline.
 python main.py
 ```
 
-The dashboard starts and opens in your browser at **http://127.0.0.1:8765/** (auto-refreshes every second). Use `--no-ui` to skip.
+Start the UI (issue URL + live dashboard):
+
+```bash
+python main.py
+```
+
+Opens **http://127.0.0.1:8765/** (auto-refreshes every second). Use `--no-ui` to skip opening the browser.
 
 ## Dashboard only (watch an existing run)
 

@@ -24,6 +24,19 @@
     </div>
   </header>
 
+  <section class="launcher panel" id="launcher">
+    <div class="launcher-row">
+      <label class="launcher-field">
+        <span>GitHub issue URL</span>
+        <input type="text" id="issue-input" placeholder="https://github.com/owner/repo/issues/123" />
+      </label>
+      <button type="button" id="run-issue" class="btn primary">Run</button>
+      <button type="button" id="retry-run" class="btn" disabled>Retry</button>
+      <button type="button" id="new-issue" class="btn">New issue</button>
+    </div>
+    <span id="job-status" class="job-status muted">Paste an issue URL and click Run.</span>
+  </section>
+
   <main class="layout">
     <section class="panel steps-panel">
       <h2>Pipeline</h2>

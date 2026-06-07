@@ -36,11 +36,21 @@ main.py → issue_understanding → context_builder → code_reasoning_agent
        → code_generator → plan_adherence_checker → validator → pr_writer
 ```
 
-## Live demo
+## Live UI
 
-When you run `python main.py`, the **live HTML dashboard** starts at **http://127.0.0.1:8765/** and **opens automatically in your browser**.
+```bash
+python main.py
+```
 
-You can watch each pipeline step, the diff, validation status, and logs update in real time. Disable with `--no-ui` or `DASHBOARD_UI=false` in `.env`.
+Opens **http://127.0.0.1:8765/** in your browser. Paste a GitHub issue URL and click **Run**. The server stays up — use **Retry** or **New issue** for the next run.
+
+To run a single issue from the terminal:
+
+```bash
+python main.py --issue https://github.com/owner/repo/issues/123
+```
+
+Disable auto-opening the browser with `--no-ui`. Disable the dashboard during CLI runs with `DASHBOARD_UI=false` in `.env`.
 
 ## Setup
 
@@ -68,13 +78,7 @@ CURSOR_API_KEY=your_cursor_api_key_here
 CURSOR_MODEL=composer-2.5
 ```
 
-Also set the issue to fix:
-
-```
-GITHUB_ISSUE_URL=https://github.com/gin-gonic/gin/issues/1234
-```
-
-The repo is cloned automatically from that URL into `test_repo/<repo>/` (saved in `output/repo.json`).
+Optional: `GITHUB_TOKEN` in `.env` for fetching private issues during the pipeline.
 
 **Step 4 — Run**
 
@@ -82,4 +86,10 @@ The repo is cloned automatically from that URL into `test_repo/<repo>/` (saved i
 python main.py
 ```
 
-The dashboard opens in your browser. Results are in `output/` and `logs/run_report.md`.
+The UI opens in your browser — paste an issue URL and click Run. Results land in `output/` and `logs/run_report.md`.
+
+Or run one issue from the terminal:
+
+```bash
+python main.py --issue https://github.com/gin-gonic/gin/issues/1234
+```
