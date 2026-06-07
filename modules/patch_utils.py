@@ -236,7 +236,7 @@ def planned_test_files(plan: str) -> list[str]:
 def plan_allows_test_only(plan: str) -> bool:
     return bool(
         re.search(
-            r"only (?:the )?regression test|only test additions|if so, only|already contain",
+            r"only (?:the )?regression test|only test additions|if so, only|already contain|tests only|test-only",
             plan,
             re.I,
         )
@@ -247,19 +247,9 @@ def planned_prod_fix_redundant(plan: str, repo_path: Path | None) -> bool:
     """True when repo already has the planned production change (tests-only patch OK)."""
     if not repo_path or not plan:
         return False
-    for path, syms in planned_symbols_by_file(plan).items():
-        if path.endswith("_test.go") or "cronRegexString" not in syms:
-            continue
-        p = repo_path / path
-        if not p.is_file():
-            continue
-        try:
-            content = p.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if "/,#L-" in content or "[A-Za-z0-9*?][A-Za-z0-9*?/,#L-]" in content:
-            return True
-    return False
+    from modules.fix_preflight import assess_fix_state
+
+    return bool(assess_fix_state(repo_path, plan=plan).get("test_only_ok"))
 
 
 def planned_symbols_by_file(plan: str) -> dict[str, list[str]]:
@@ -417,8 +407,14 @@ def patch_integrity_issues(
     symbol_issues = patch_planned_symbol_issues(patch, plan) if plan else []
     if test_only:
         symbol_issues = [
-            i for i in symbol_issues if not i.startswith("PLANNED_SYMBOL_NOT_TOUCHED: regexes.go")
+            i for i in symbol_issues if not i.startswith("PLANNED_SYMBOL_NOT_TOUCHED:")
         ]
+        planned_tests = re.findall(r"`(Test[A-Za-z0-9_]+)`", plan)
+        if planned_tests and tests and not any(t in patch for t in planned_tests):
+            symbol_issues.append(
+                "MISSING_PLANNED_TEST: patch must include a planned test "
+                f"({', '.join(planned_tests[:4])})"
+            )
     issues.extend(symbol_issues)
 
     for path, st in _file_change_stats(patch).items():

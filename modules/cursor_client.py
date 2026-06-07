@@ -62,8 +62,14 @@ Do not modify repository files unless explicitly asked to apply changes."""
         text = (result.result or "").strip()
 
         if result.status in ("error", "cancelled", "expired"):
+            hint = ""
+            if result.status == "error" and not text:
+                hint = (
+                    " (empty error — try CURSOR_MODEL=default in .env; "
+                    f"composer-2.5 local runs often fail silently)"
+                )
             raise RuntimeError(
-                f"Cursor agent finished with status={result.status}: {text[:500]}"
+                f"Cursor agent finished with status={result.status}: {text[:500]}{hint}"
             )
         if not text:
             raise RuntimeError("Empty response from Cursor API")

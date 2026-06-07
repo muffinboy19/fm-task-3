@@ -27,6 +27,8 @@ from modules.agent_logger import get_logger
 from modules.repo_resolver import default_output_dir, effective_repo_path
 from modules.convention import format_conventions_block, build_system_prompt
 from modules.repo_hints import scope_guidance
+from modules.fix_preflight import format_fix_state_block
+from modules.retry_hints import build_retry_prompt
 
 
 MINIMAL_RETRY = (
@@ -62,6 +64,12 @@ class CodeGenerator:
         previous_patch: str,
         error_output: str,
     ) -> str:
+        user_extra = build_retry_prompt(
+            (error_output or "").split(";"),
+            fix_state=issue.get("fix_state"),
+            patch_excerpt=previous_patch[:8000],
+            include_minimal=True,
+        )
         user_extra = f"""
 
 ---
@@ -78,14 +86,16 @@ class CodeGenerator:
 {error_output[-8000:]}
 ```
 
-Fix the implementation so the resulting patch applies cleanly and passes `go test`.
+{user_extra}
+
+Fix the implementation so the resulting patch applies cleanly and passes validation.
 """
         return self._generate_patch(
             issue,
             context,
             plan,
             module="code_generator_retry",
-            user_extra=user_extra + MINIMAL_RETRY,
+            user_extra=user_extra,
             prefer_edit_mode=True,
         )
 
@@ -107,6 +117,9 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
         last_diag: dict = {}
         issue_type = (issue.get("understanding") or {}).get("type", "")
         required_prod = planned_production_files(plan)
+        fix_state = issue.get("fix_state") or {}
+        if fix_state.get("test_only_ok"):
+            required_prod = []
 
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
             use_edit = prefer_edit_mode or attempt >= 3
@@ -153,7 +166,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
             if integrity:
                 log.warning(f"Patch integrity: {integrity[:4]}")
                 diag["integrity_issues"] = integrity
-                feedback = self._format_retry_feedback(diag, patch, integrity)
+                feedback = self._format_retry_feedback(diag, patch, integrity, issue)
                 log.warning(f"Attempt {attempt} failed integrity check — retrying")
                 continue
 
@@ -174,7 +187,7 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
                     log.warning("Patch has no *_test.go changes")
                 return patch
 
-            feedback = self._format_retry_feedback(diag, patch, integrity)
+            feedback = self._format_retry_feedback(diag, patch, integrity, issue)
             log.warning(f"Attempt {attempt} failed apply check — retrying")
 
         log.warning("All patch attempts failed apply check; returning last patch")
@@ -345,11 +358,15 @@ Fix the implementation so the resulting patch applies cleanly and passes `go tes
         )
 
     def _build_diff_user_prompt(self, issue: dict, context: dict, plan: str) -> str:
+        fix_block = context.get("fix_state_block") or format_fix_state_block(
+            issue.get("fix_state") or {}
+        )
         return f"""## Issue
 **{issue['title']}** ({issue['url']})
 
 {issue['body']}
 
+{fix_block}
 ## Fix plan
 {plan}
 
@@ -389,11 +406,15 @@ REQUIRED:
                 + ". Add new test cases in a new small `*_test.go` file instead.\n"
             )
 
+        fix_block = context.get("fix_state_block") or format_fix_state_block(
+            issue.get("fix_state") or {}
+        )
         return f"""## Issue
 **{issue['title']}** ({issue['url']})
 
 {issue['body']}
 
+{fix_block}
 ## Fix plan
 {plan}
 
@@ -414,33 +435,15 @@ Keep each file as close to the original as possible — minimal edits only.
 """
 
     def _format_retry_feedback(
-        self, diag: dict, patch: str, integrity: list[str] | None = None
+        self, diag: dict, patch: str, integrity: list[str] | None = None, issue: dict | None = None
     ) -> str:
         issues = list(diag.get("issues") or []) + list(integrity or [])
-        stderr = diag.get("git_apply_stderr") or ""
-        return f"""
-
----
-
-## Previous attempt failed
-
-Issues:
-{chr(10).join(f'- {i}' for i in issues[:12])}
-
-git apply stderr:
-```
-{stderr[:4000]}
-```
-
-Previous patch (truncated):
-```diff
-{patch[:8000]}
-```
-
-{MINIMAL_RETRY}
-
-Use FILE: blocks with complete file contents so we can export a real git diff.
-"""
+        return build_retry_prompt(
+            issues,
+            fix_state=(issue or {}).get("fix_state"),
+            stderr=diag.get("git_apply_stderr") or "",
+            patch_excerpt=patch[:8000],
+        )
 
     def _normalize_patch(self, patch: str) -> str:
         if patch.startswith("ERROR:"):

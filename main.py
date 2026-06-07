@@ -11,14 +11,17 @@ from modules.agent_logger import init_logger, get_logger
 from modules.issue_understanding import IssueUnderstanding
 from modules.context_builder import ContextBuilder
 from modules.code_reasoning_agent import CodeReasoningAgent
-from modules.code_generator import CodeGenerator, MINIMAL_RETRY
+from modules.code_generator import CodeGenerator
 from modules.plan_adherence_checker import PlanAdherenceChecker
 from modules.validator import Validator
 from modules.pr_writer import PRWriter
+from modules.fix_preflight import assess_fix_state, format_fix_state_block
+from modules.retry_hints import build_retry_prompt
 from modules.convention import format_conventions_block, load_conventions_prompt
 from modules.issue_guardrails import load_candidates, pick_next_candidate
 from modules.live_state import clear_stale_run_outputs
 from modules.repo_resolver import resolve_repo_path, save_repo_manifest
+from modules.repo_reset import reset_repo, should_reset_repo
 
 
 def parse_args():
@@ -32,7 +35,11 @@ def parse_args():
     parser.add_argument("--output", default=None)
     parser.add_argument("--log-dir", default=None)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--no-reset", action="store_true", help="Do not reset repo before run")
+    parser.add_argument(
+        "--no-reset",
+        action="store_true",
+        help="Do not reset test_repo clone before or after the run",
+    )
     parser.add_argument(
         "--stop-after",
         type=int,
@@ -119,20 +126,6 @@ def build_draft_pr_summary(issue: dict, plan: str, result: dict) -> str:
 def parse_env_bool(key: str, default: bool = False) -> bool:
     val = get_env(key, "false" if not default else "true").lower()
     return val in ("1", "true", "yes", "on")
-
-
-def reset_repo(repo_path: Path, log) -> bool:
-    """Reset target repo to clean git state."""
-    if not (repo_path / ".git").exists():
-        log.warning("Not a git repo — skip reset")
-        return False
-    log.info("Resetting repository (git checkout + clean)...")
-    subprocess.run(["git", "checkout", "--", "."], cwd=repo_path, check=False)
-    subprocess.run(["git", "clean", "-fd"], cwd=repo_path, check=False)
-    r = subprocess.run(["git", "status", "--short"], cwd=repo_path, capture_output=True, text=True)
-    clean = not (r.stdout or "").strip()
-    log.kv("Repo clean after reset", clean)
-    return clean
 
 
 def main():
@@ -225,13 +218,38 @@ def main():
     else:
         repo_path = None
 
-    if (
-        repo_path
-        and not args.no_reset
-        and (not args.stop_after or args.stop_after > 1)
-    ):
-        reset_repo(repo_path, log)
+    reset_after_run = should_reset_repo(args.no_reset, args.stop_after)
 
+    if repo_path and reset_after_run:
+        reset_repo(repo_path, log, when="before run")
+
+    try:
+        _run_issue_pipeline(
+            args=args,
+            issue_url=issue_url,
+            output_dir=output_dir,
+            log=log,
+            repo_path=repo_path,
+            api_key=api_key,
+            github_token=github_token,
+            dry_run=dry_run,
+        )
+    finally:
+        if repo_path and reset_after_run:
+            reset_repo(repo_path, log, when="after run")
+
+
+def _run_issue_pipeline(
+    *,
+    args,
+    issue_url: str,
+    output_dir: Path,
+    log,
+    repo_path: Path | None,
+    api_key,
+    github_token,
+    dry_run: bool,
+) -> None:
     log.step_start("1", "Extract raw issue + structured intake...")
     try:
         issue = IssueUnderstanding(
@@ -314,6 +332,10 @@ def main():
             {f["file"] for f in context["candidate_functions"]}
         )
         log.step_ok("2", f"{n} functions in {len(files)} file(s)")
+        early_fix = assess_fix_state(repo_path, issue=issue)
+        for w in early_fix.get("warnings") or []:
+            log.warning(w)
+        context["fix_preflight_warnings"] = early_fix.get("warnings") or []
         log.kv("Anchor paths", context.get("anchor_paths_used"))
         log.kv("Grep terms", context.get("grep_terms_used"))
         log.kv("Files in scope", ", ".join(files[:8]))
@@ -342,6 +364,22 @@ def main():
     log.step_start("3", "LLM generating fix plan...")
     try:
         plan = CodeReasoningAgent(api_key=api_key).plan(issue=issue, context=context)
+        fix_state = assess_fix_state(repo_path, plan=plan, issue=issue)
+        issue["fix_state"] = fix_state
+        context["fix_state_block"] = format_fix_state_block(fix_state)
+        if fix_state.get("test_only_ok"):
+            plan = (
+                plan.rstrip()
+                + "\n\n## Repo state (auto-detected)\n"
+                + "Production fix is **already present** on this branch. "
+                + "Implement **tests only** — do not edit production `.go` files.\n"
+            )
+            log.warning(
+                "Production fix already in repo — test-only patch expected: "
+                + ", ".join(fix_state.get("already_fixed_files") or [])
+            )
+        for w in fix_state.get("warnings") or []:
+            log.warning(w)
         plan_path = output_dir / "plan.md"
         plan_path.write_text(plan, encoding="utf-8")
         log.step_ok("3", f"plan.md ({len(plan)} chars)")
@@ -493,7 +531,15 @@ def main():
                         + test_out[-6000:]
                     )
                     if build_failed or integrity_failed:
-                        regen_hint = MINIMAL_RETRY + "\n\n" + regen_hint
+                        regen_hint = (
+                            build_retry_prompt(
+                                (err or "").split(";"),
+                                fix_state=issue.get("fix_state"),
+                                stderr=test_out[-3000:],
+                            )
+                            + "\n\n"
+                            + regen_hint
+                        )
                     try:
                         regen = generator.regenerate(
                             issue,

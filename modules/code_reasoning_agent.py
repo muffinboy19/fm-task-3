@@ -39,6 +39,11 @@ List only files explicitly named in the issue or anchors below.
 Warn in Assumptions if file list is unclear — do not guess new packages.
 """
 
+        warnings = context.get("fix_preflight_warnings") or []
+        warn_block = ""
+        if warnings:
+            warn_block = "### Preflight warnings\n" + "\n".join(f"- {w}" for w in warnings) + "\n"
+
         return f"""## GitHub Issue
 
 **URL:** {issue['url']}
@@ -53,7 +58,7 @@ Warn in Assumptions if file list is unclear — do not guess new packages.
 - **Symptom:** {u.get('symptom', issue['title'])}
 - **Expected:** {u.get('expected', 'unknown')}
 - **Actual:** {u.get('actual', 'unknown')}
-{scope_block}
+{warn_block}{scope_block}
 ### Curated grep terms (files in scope below)
 {', '.join(issue.get('grep_terms') or issue['search_terms']) or 'none'}
 
