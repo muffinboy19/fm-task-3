@@ -139,3 +139,7 @@ Or run one issue from the terminal:
 ```bash
 python main.py --issue https://github.com/gin-gonic/gin/issues/1234
 ```
+
+
+
+![Visitor Count](https://visitor-badge.laobi.icu/badge?page_id=yourusername.yourrepo)
